@@ -64,15 +64,25 @@ This project contains a comprehensive email marketing solution for the cannabis 
    - Configure API permissions
    - Generate client credentials
 
-4. **Update configuration**
+4. **Configure environment variables**
    
-   Edit `config.py` with your credentials:
-   ```python
-   SENDER_EMAIL = "your-email@domain.com"
-   TENANT_ID = "your-tenant-id"
-   CLIENT_ID = "your-client-id"
-   CLIENT_SECRET = "your-client-secret"
+   Copy the example environment file and configure your credentials:
+   ```bash
+   cp .env.example .env
    ```
+   
+   Edit `.env` with your actual credentials:
+   ```bash
+   # Required OAuth credentials
+   TIERII_SENDER_EMAIL=your-email@domain.com
+   TIERII_SMTP_SERVER=smtp.office365.com
+   TIERII_TENANT_ID=your-tenant-id
+   TIERII_CLIENT_ID=your-client-id
+   TIERII_CLIENT_SECRET=your-client-secret
+   TIERII_EMAIL_SUBJECT="Your Email Subject"
+   ```
+   
+   ⚠️ **SECURITY WARNING**: Never commit `.env` files to version control!
 
 5. **Test your setup**
    ```bash
@@ -134,11 +144,34 @@ The project includes a verified CSV database (`tier_i_tier_ii_emails_verified.cs
 
 ## 🔒 Security & Compliance
 
+### ⚠️ CRITICAL SECURITY WARNINGS
+
+**Environment Variables & Secrets Management:**
+- **NEVER commit `.env` files to version control** - they contain sensitive credentials
+- **NEVER hardcode secrets** in source code or configuration files
+- **Use unique, strong client secrets** and rotate them regularly
+- **Limit access** to `.env` files using appropriate file permissions (600/640)
+- **Use Azure Key Vault** or similar secret management for production deployments
+- **Audit access** to configuration files and credentials regularly
+
+**OAuth 2.0 Security:**
+- **Verify redirect URIs** are properly configured in Azure AD
+- **Use least privilege** - only grant necessary API permissions
+- **Monitor token usage** and revoke compromised tokens immediately
+- **Enable MFA** on accounts with OAuth application access
+
+**Development Security:**
+- **Use separate credentials** for development, staging, and production
+- **Never share credentials** via email, chat, or other insecure channels
+- **Clean up test data** and temporary credentials after development
+- **Review code changes** for accidentally committed secrets before merging
+
 ### Data Protection
 - OAuth 2.0 authentication (no password storage)
 - Automatic token refresh and management
-- Secure credential handling
+- Environment-based secure credential handling
 - Rate limiting to prevent abuse
+- Input validation and sanitization
 
 ### Email Compliance
 - Personalized, relevant business communications
