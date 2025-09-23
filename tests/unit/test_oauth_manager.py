@@ -22,19 +22,13 @@ class TestOAuthTokenManager:
     @pytest.fixture
     def token_manager(self):
         """Create a fresh OAuthTokenManager instance for each test."""
-        with patch.dict(
-            "sys.modules",
-            {
-                "config": Mock(
-                    TENANT_ID="12345678-1234-1234-1234-123456789abc",
-                    CLIENT_ID="87654321-4321-4321-4321-cba987654321",
-                    CLIENT_SECRET="test-client-secret",
-                )
-            },
-        ):
-            from email_campaign import OAuthTokenManager
+        from auth import OAuthTokenManager
 
-            return OAuthTokenManager()
+        return OAuthTokenManager(
+            tenant_id="12345678-1234-1234-1234-123456789abc",
+            client_id="87654321-4321-4321-4321-cba987654321",
+            client_secret="test-client-secret"
+        )
 
     @pytest.fixture
     def mock_successful_response(self):
@@ -68,7 +62,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_success(
         self, mock_post, token_manager, mock_successful_response
     ):
@@ -87,11 +81,8 @@ class TestOAuthTokenManager:
             assert token == "mock_access_token_12345"
             assert token_manager.access_token == "mock_access_token_12345"
 
-            # Verify token expiry is set correctly (3600 - 300 = 3300 seconds from frozen time)
-            frozen_time = (
-                datetime.now()
-            )  # Use datetime.now() to get FakeDatetime object
-            expected_expiry = frozen_time + timedelta(seconds=3300)
+            # Verify token expiry is set correctly (3600 seconds from frozen time minus 5-minute buffer)
+            expected_expiry = datetime(2024, 1, 1, 12, 55, 0)  # 12:00 + 1 hour - 5 minutes buffer
             assert token_manager.token_expiry == expected_expiry
 
         # Verify correct API call
@@ -112,7 +103,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_uses_cached_token(
         self, mock_post, token_manager, freeze_time_fixture
     ):
@@ -134,7 +125,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_refreshes_expired_token(
         self, mock_post, token_manager, mock_successful_response, freeze_time_fixture
     ):
@@ -160,7 +151,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_http_error(
         self, mock_post, token_manager, mock_error_response
     ):
@@ -172,7 +163,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_connection_error(self, mock_post, token_manager):
         """Test handling of connection errors during token acquisition."""
         mock_post.side_effect = requests.exceptions.ConnectionError("Connection failed")
@@ -182,7 +173,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_timeout_error(self, mock_post, token_manager):
         """Test handling of timeout errors during token acquisition."""
         mock_post.side_effect = requests.exceptions.Timeout("Request timed out")
@@ -192,7 +183,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_custom_expires_in(
         self, mock_post, token_manager, freeze_time_fixture
     ):
@@ -217,7 +208,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_missing_expires_in(
         self, mock_post, token_manager, freeze_time_fixture
     ):
@@ -239,7 +230,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_invalid_json_response(self, mock_post, token_manager):
         """Test handling of invalid JSON in response."""
         mock_response = Mock()
@@ -252,7 +243,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_get_access_token_missing_access_token_in_response(
         self, mock_post, token_manager
     ):
@@ -271,7 +262,7 @@ class TestOAuthTokenManager:
 
     @pytest.mark.oauth
     @pytest.mark.unit
-    @patch("email_campaign.requests.post")
+    @patch("auth.oauth_token_manager.requests.post")
     def test_multiple_token_requests(
         self, mock_post, token_manager, mock_successful_response
     ):

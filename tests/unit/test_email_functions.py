@@ -8,11 +8,22 @@ from unittest.mock import Mock, patch
 import smtplib
 import sys
 import os
+import importlib
 
 # Add src to path for imports
-src_path = os.path.join(os.path.dirname(__file__), "..", "..", "src")
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
+
+# Import the functions we need to test
+try:
+    from email_campaign import get_first_name, get_oauth_string, send_email
+    import src.email_campaign
+except ImportError as e:
+    print(f"Import error: {e}")
+    print(f"Current sys.path: {sys.path}")
+    print(f"Trying to import from: {src_path}")
+    raise
 
 
 class TestEmailFunctions:
@@ -42,8 +53,6 @@ class TestEmailFunctions:
     )
     def test_get_first_name(self, input_name, expected_first_name):
         """Test get_first_name function with various inputs."""
-        from src.email_campaign import get_first_name
-
         result = get_first_name(input_name)
         assert result == expected_first_name
 
@@ -51,8 +60,6 @@ class TestEmailFunctions:
     @pytest.mark.unit
     def test_get_oauth_string(self):
         """Test get_oauth_string function."""
-        from src.email_campaign import get_oauth_string
-
         username = "test@example.com"
         access_token = "mock_access_token_12345"
 
@@ -73,8 +80,6 @@ class TestEmailFunctions:
     @pytest.mark.unit
     def test_get_oauth_string_empty_inputs(self):
         """Test get_oauth_string with empty inputs."""
-        from src.email_campaign import get_oauth_string
-
         # Test with empty username
         result1 = get_oauth_string("", "token")
         import base64
@@ -92,14 +97,20 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_success(self, mock_token_manager, mock_smtp_class):
+    def test_send_email_success(self, mock_smtp_class):
         """Test successful email sending."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
-
+        # Setup auth manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        
+        mock_auth_manager = Mock()
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
+        
+        # Directly set the auth_manager in the module
+        src.email_campaign.auth_manager = mock_auth_manager
+        
         # Setup SMTP mock
         mock_smtp = Mock()
         mock_smtp_class.return_value = mock_smtp
@@ -109,12 +120,10 @@ class TestEmailFunctions:
         to_name = "John"
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function
-        result = send_email(to_email, first_name)
+        result = src.email_campaign.send_email(to_email, first_name)
 
         # Assertions
         assert result is True
@@ -124,7 +133,7 @@ class TestEmailFunctions:
         mock_smtp.starttls.assert_called_once()
 
         # Verify OAuth authentication
-        mock_token_manager.get_access_token.assert_called_once()
+        mock_current_manager.get_access_token.assert_called_once()
 
         # Verify email sending
         mock_smtp.sendmail.assert_called_once()
@@ -134,15 +143,17 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
+    @patch("src.email_campaign.auth_manager")
     def test_send_email_smtp_connection_error(
-        self, mock_token_manager, mock_smtp_class
+        self, mock_auth_manager, mock_smtp_class
     ):
         """Test email sending with SMTP connection error."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
+        # Setup auth manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
 
         # Setup SMTP mock to raise connection error
         mock_smtp_class.side_effect = smtplib.SMTPConnectError(421, "Connection failed")
@@ -152,12 +163,10 @@ class TestEmailFunctions:
         to_name = "John"
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function
-        result = send_email(to_email, first_name)
+        result = src.email_campaign.send_email(to_email, first_name)
 
         # Should return False on connection error
         assert result is False
@@ -165,13 +174,15 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_authentication_error(self, mock_token_manager, mock_smtp_class):
+    @patch("src.email_campaign.auth_manager")
+    def test_send_email_authentication_error(self, mock_auth_manager, mock_smtp_class):
         """Test email sending with authentication error."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock to raise error
-        mock_token_manager.get_access_token.side_effect = Exception("OAuth failed")
+        # Setup auth manager mock to raise error
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.side_effect = Exception("OAuth failed")
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
 
         # Setup SMTP mock
         mock_smtp = Mock()
@@ -182,12 +193,10 @@ class TestEmailFunctions:
         to_name = "John"
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function
-        result = send_email(to_email, first_name)
+        result = src.email_campaign.send_email(to_email, first_name)
 
         # Should return False on authentication error
         assert result is False
@@ -195,13 +204,15 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_send_message_error(self, mock_token_manager, mock_smtp_class):
+    @patch("src.email_campaign.auth_manager")
+    def test_send_email_send_message_error(self, mock_auth_manager, mock_smtp_class):
         """Test email sending with send_message error."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
+        # Setup auth manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
 
         # Setup SMTP mock with sendmail error
         mock_smtp = Mock()
@@ -213,28 +224,33 @@ class TestEmailFunctions:
         to_name = "John"
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function
-        result = send_email(to_email, first_name)
+        result = src.email_campaign.send_email(to_email, first_name)
 
         # Should return False on send error
         assert result is False
-        # quit() is only called on success, not on exceptions
-        mock_smtp.quit.assert_not_called()
+        # quit() is always called in the finally block, even on exceptions
+        mock_smtp.quit.assert_called()
 
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_message_content(self, mock_token_manager, mock_smtp_class):
+    def test_send_email_message_content(self, mock_smtp_class):
         """Test that email message content is properly formatted."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
+        # Setup current manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        
+        # Setup auth manager mock with proper interface
+        mock_auth_manager = Mock()
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
+        
+        # Directly set the auth_manager in the module
+        src.email_campaign.auth_manager = mock_auth_manager
 
         # Setup SMTP mock
         mock_smtp = Mock()
@@ -242,11 +258,17 @@ class TestEmailFunctions:
 
         # Test data
         to_email = "recipient@example.com"
-        to_name = "John"
+        first_name = "John"
 
         # Call function
-        result = send_email(to_email, to_name)
-
+        result = src.email_campaign.send_email(to_email, first_name)
+        
+        # Verify the function succeeded
+        assert result is True
+        
+        # Verify sendmail was called
+        mock_smtp.sendmail.assert_called_once()
+        
         # Get the sendmail call arguments
         call_args = mock_smtp.sendmail.call_args[0]
         from_addr = call_args[0]
@@ -263,13 +285,20 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_personalization(self, mock_token_manager, mock_smtp_class):
+    def test_send_email_personalization(self, mock_smtp_class):
         """Test email personalization with first name extraction."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
+        # Setup current manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        
+        # Setup auth manager mock with proper interface
+        mock_auth_manager = Mock()
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
+        
+        # Directly set the auth_manager in the module
+        src.email_campaign.auth_manager = mock_auth_manager
 
         # Setup SMTP mock
         mock_smtp = Mock()
@@ -280,14 +309,14 @@ class TestEmailFunctions:
         to_name = "Dr. Jane Smith"  # Full name with title
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function
-        result = send_email(to_email, first_name)
+        result = src.email_campaign.send_email(to_email, first_name)
 
-        # Get the sendmail call arguments
+        # Verify the function was called and get the sendmail call arguments
+        assert result is True
+        mock_smtp.sendmail.assert_called_once()
         call_args = mock_smtp.sendmail.call_args[0]
         message_text = call_args[2]
 
@@ -298,13 +327,20 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_empty_name_fallback(self, mock_token_manager, mock_smtp_class):
+    def test_send_email_empty_name_fallback(self, mock_smtp_class):
         """Test email personalization fallback for empty names."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
+        # Setup current manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        
+        # Setup auth manager mock with proper interface
+        mock_auth_manager = Mock()
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
+        
+        # Directly set the auth_manager in the module
+        src.email_campaign.auth_manager = mock_auth_manager
 
         # Setup SMTP mock
         mock_smtp = Mock()
@@ -315,14 +351,14 @@ class TestEmailFunctions:
         to_name = ""
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function
-        result = send_email(to_email, first_name)
+        result = src.email_campaign.send_email(to_email, first_name)
 
-        # Get the sendmail call arguments
+        # Verify the function was called and get the sendmail call arguments
+        assert result is True
+        mock_smtp.sendmail.assert_called_once()
         call_args = mock_smtp.sendmail.call_args[0]
         message_text = call_args[2]
 
@@ -334,13 +370,20 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_special_characters(self, mock_token_manager, mock_smtp_class):
+    def test_send_email_special_characters(self, mock_smtp_class):
         """Test email sending with special characters in content."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
+        # Setup current manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        
+        # Setup auth manager mock with proper interface
+        mock_auth_manager = Mock()
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
+        
+        # Directly set the auth_manager in the module
+        src.email_campaign.auth_manager = mock_auth_manager
 
         # Setup SMTP mock
         mock_smtp = Mock()
@@ -351,12 +394,10 @@ class TestEmailFunctions:
         to_name = "José María"
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function
-        result = send_email(to_email, first_name)
+        result = src.email_campaign.send_email(to_email, first_name)
 
         # Should handle special characters without error
         assert result is True
@@ -375,13 +416,15 @@ class TestEmailFunctions:
     @pytest.mark.email
     @pytest.mark.unit
     @patch("src.email_campaign.smtplib.SMTP")
-    @patch("src.email_campaign.token_manager")
-    def test_send_email_cleanup_on_exception(self, mock_token_manager, mock_smtp_class):
+    @patch("src.email_campaign.auth_manager")
+    def test_send_email_cleanup_on_exception(self, mock_auth_manager, mock_smtp_class):
         """Test that SMTP connection is properly cleaned up on exceptions."""
-        from src.email_campaign import send_email
-
-        # Setup OAuth manager mock
-        mock_token_manager.get_access_token.return_value = "mock_token_12345"
+        # Setup auth manager mock
+        mock_current_manager = Mock()
+        mock_current_manager.is_authenticated = True
+        mock_current_manager.get_access_token.return_value = "mock_token_12345"
+        mock_current_manager.provider.name = "MICROSOFT_OAUTH"
+        mock_auth_manager.get_current_manager.return_value = mock_current_manager
 
         # Setup SMTP mock with exception during auth
         mock_smtp = Mock()
@@ -393,8 +436,6 @@ class TestEmailFunctions:
         to_name = "John Doe"
 
         # Process the name first (like the real code does)
-        from src.email_campaign import get_first_name
-
         first_name = get_first_name(to_name)
 
         # Call function

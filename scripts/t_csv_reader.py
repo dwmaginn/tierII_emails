@@ -63,7 +63,7 @@ def main():
     # Show first few contacts as preview
     print("\nPREVIEW OF FIRST 10 CONTACTS:")
     for i, contact in enumerate(contacts[:10]):
-        print(f"{i+1"2d"}. {contact['contact_name']"30"} -> First name: \"{contact['first_name']"15"}\" -> {contact['email']}")
+        print(f"{str(i + 1).zfill(2)}. {contact['contact_name']:<30} -> First name: \"{contact['first_name']:<15}\" -> {contact['email']}")
 
     if len(contacts) > 10:
         print("...")

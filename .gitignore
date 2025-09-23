@@ -172,3 +172,6 @@ Thumbs.db
 .env.luke
 
 sensitive/
+
+venv/
+.ruff_cache/

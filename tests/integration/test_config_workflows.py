@@ -8,6 +8,10 @@ while using test data to prevent unintended email sends.
 import pytest
 from unittest.mock import patch
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
 from tests.fixtures import (
     get_david_config,
     apply_david_config,
@@ -74,8 +78,8 @@ class TestDavidMicrosoftWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.oauth
-    @patch("src.auth.oauth_manager.OAuthManager.get_access_token")
-    @patch("src.email.smtp_client.SMTPClient.send_email")
+    @patch("src.auth.oauth_token_manager.OAuthTokenManager.get_access_token")
+    @patch("src.email_utils.smtp_client.SMTPClient.send_email")
     def test_david_full_workflow_dry_run(self, mock_send_email, mock_get_token):
         """Test David's full email workflow in dry run mode."""
         # Mock OAuth token response
@@ -87,7 +91,7 @@ class TestDavidMicrosoftWorkflow:
         from src.email_campaign import EmailCampaign
 
         campaign = EmailCampaign()
-        result = campaign.run_campaign()
+        result = campaign.send_campaign()
 
         # Verify dry run behavior
         assert result is not None
@@ -150,7 +154,7 @@ class TestLukeGmailWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email.smtp_client.SMTPClient.send_email")
+    @patch("src.email_utils.smtp_client.SMTPClient.send_email")
     def test_luke_full_workflow_dry_run(self, mock_send_email):
         """Test Luke's full email workflow in dry run mode."""
         # Mock email sending (should not be called in dry run)
@@ -159,7 +163,7 @@ class TestLukeGmailWorkflow:
         from src.email_campaign import EmailCampaign
 
         campaign = EmailCampaign()
-        result = campaign.run_campaign()
+        result = campaign.send_campaign()
 
         # Verify dry run behavior
         assert result is not None

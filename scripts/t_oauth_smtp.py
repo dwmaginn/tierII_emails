@@ -16,17 +16,22 @@ import sys
 
 # Import configuration
 try:
-    from config import (
-        SENDER_EMAIL,
-        SMTP_SERVER,
-        SMTP_PORT,
-        TENANT_ID,
-        CLIENT_ID,
-        CLIENT_SECRET,
-    )
-except ImportError:
+    from src.config.settings import TierIISettings
+    settings = TierIISettings()
+    SENDER_EMAIL = settings.sender_email
+    SMTP_SERVER = settings.smtp_server
+    SMTP_PORT = settings.smtp_port
+    TENANT_ID = settings.tenant_id
+    CLIENT_ID = settings.client_id
+    CLIENT_SECRET = settings.client_secret
+except ImportError as e:
     print(
-        "Error: config.py file not found. Please ensure config.py exists with your OAuth credentials."
+        f"Error: Could not import settings: {e}. Please ensure src.config.settings is available."
+    )
+    sys.exit(1)
+except Exception as e:
+    print(
+        f"Error: Could not load configuration: {e}. Please check your environment variables."
     )
     sys.exit(1)
 

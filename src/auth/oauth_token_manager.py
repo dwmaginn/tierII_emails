@@ -66,29 +66,19 @@ class OAuthTokenManager:
             "scope": self.scope,
         }
 
-        try:
-            response = requests.post(token_url, data=token_data, timeout=30)
-            response.raise_for_status()
+        response = requests.post(token_url, data=token_data, timeout=30)
+        response.raise_for_status()
 
-            token_info = response.json()
-            self.access_token = token_info["access_token"]
-            expires_in = token_info.get("expires_in", 3600)  # Default to 1 hour
-            self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
+        token_info = response.json()
+        self.access_token = token_info["access_token"]
+        expires_in = token_info.get("expires_in", 3600)  # Default to 1 hour
+        # Apply 5-minute buffer to expiry time
+        self.token_expiry = datetime.now() + timedelta(seconds=expires_in - 300)
 
-            print(
-                f"Successfully obtained access token. Expires at: {self.token_expiry}"
-            )
-            return self.access_token
-
-        except requests.exceptions.RequestException as e:
-            print(f"Error obtaining access token: {e}")
-            return None
-        except json.JSONDecodeError as e:
-            print(f"Error parsing token response: {e}")
-            return None
-        except KeyError as e:
-            print(f"Missing key in token response: {e}")
-            return None
+        print(
+            f"Successfully obtained access token. Expires at: {self.token_expiry}"
+        )
+        return self.access_token
 
     def is_token_valid(self) -> bool:
         """Check if the current token is valid.

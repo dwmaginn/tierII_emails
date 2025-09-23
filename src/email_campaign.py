@@ -5,76 +5,145 @@ from email.mime.multipart import MIMEMultipart
 import time
 import sys
 import base64
-import requests
 from datetime import datetime, timedelta
+from typing import Optional
+import logging
+import os
 
-# Import configuration
+# Import authentication components
+from auth.authentication_factory import authentication_factory
+from auth.base_authentication_manager import (
+    AuthenticationError,
+    TokenExpiredError,
+    InvalidCredentialsError,
+    NetworkError,
+    AuthenticationProvider
+)
+
+# Import configuration from new settings module
+# Legacy config.py has been replaced with config/settings.py
+
+# Import settings for authentication configuration
 try:
-    from config import (
-        SENDER_EMAIL,
-        SMTP_SERVER,
-        SMTP_PORT,
-        BATCH_SIZE,
-        DELAY_MINUTES,
-        TENANT_ID,
-        CLIENT_ID,
-        CLIENT_SECRET,
-    )
+    from config.settings import TierIISettings
+    settings = TierIISettings()
 except ImportError:
     print(
-        "Error: config.py file not found. Please create config.py with your OAuth credentials."
+        "Warning: settings.py not found. Using legacy configuration."
     )
-    sys.exit(1)
+    settings = None
+
+# Legacy configuration fallback
+TENANT_ID = os.getenv('TENANT_ID')
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+SENDER_EMAIL = os.getenv('SENDER_EMAIL')
+SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.office365.com')
+SMTP_PORT = os.getenv('SMTP_PORT', '587')
+
+# Campaign configuration
+if settings:
+    BATCH_SIZE = settings.campaign_batch_size
+    DELAY_MINUTES = settings.campaign_delay_minutes
+else:
+    BATCH_SIZE = int(os.getenv('TIERII_CAMPAIGN_BATCH_SIZE', '10'))
+    DELAY_MINUTES = int(os.getenv('TIERII_CAMPAIGN_DELAY_MINUTES', '5'))
 
 # Email template
 SUBJECT = "High-Quality Cannabis Available - Honest Pharmco"
 
 
-# OAuth 2.0 token management
-class OAuthTokenManager:
-    def __init__(self):
-        self.access_token = None
-        self.token_expiry = None
-        self.scope = "https://outlook.office365.com/.default"
-
-    def get_access_token(self):
-        """Get a valid access token, refreshing if necessary"""
-        if (
-            self.access_token
-            and self.token_expiry
-            and datetime.now() < self.token_expiry
-        ):
-            return self.access_token
-
-        # Request new token
-        token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
-        token_data = {
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-            "scope": self.scope,
-            "grant_type": "client_credentials",
-        }
-
-        try:
-            response = requests.post(token_url, data=token_data)
-            response.raise_for_status()
-            token_response = response.json()
-
-            self.access_token = token_response["access_token"]
-            # Set expiry to 5 minutes before actual expiry for safety
-            expires_in = token_response.get("expires_in", 3600) - 300
-            self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
-
-            print("✓ OAuth token obtained successfully")
-            return self.access_token
-
-        except requests.exceptions.RequestException as e:
-            print(f"✗ Failed to obtain OAuth token: {e}")
-            raise
+class EmailCampaign:
+    """Email campaign management class."""
+    
+    def __init__(self, csv_file=None, batch_size=10, delay_minutes=5):
+        self.csv_file = csv_file or "tier_i_tier_ii_emails_verified.csv"
+        self.batch_size = batch_size
+        self.delay_minutes = delay_minutes
+        self.contacts = []
+        
+    def load_contacts(self):
+        """Load contacts from CSV file."""
+        self.contacts = read_contacts_from_csv(self.csv_file)
+        return self.contacts
+        
+    def send_campaign(self):
+        """Send the email campaign."""
+        if not self.contacts:
+            self.load_contacts()
+        
+        if not self.contacts:
+            print("No contacts found. Exiting.")
+            return False
+            
+        total_sent = 0
+        start_index = 0
+        
+        while start_index < len(self.contacts):
+            successful_sends, next_index = send_batch_emails(
+                self.contacts, start_index, self.batch_size
+            )
+            total_sent += successful_sends
+            start_index = next_index
+            
+            # If there are more batches to send, wait for the specified delay
+            if start_index < len(self.contacts):
+                time.sleep(self.delay_minutes * 60)
+                
+        return total_sent
 
 
-# Global token manager instance
-token_manager = OAuthTokenManager()
+# Initialize authentication manager with fallback
+def create_authentication_manager():
+    """Create authentication manager with Microsoft OAuth -> Gmail fallback."""
+    try:
+        # Use settings if available, otherwise fall back to legacy config
+        if settings:
+            # Configure from settings
+            config = {
+                "tenant_id": getattr(settings, 'microsoft_tenant_id', None),
+                "client_id": getattr(settings, 'microsoft_client_id', None),
+                "client_secret": getattr(settings, 'microsoft_client_secret', None),
+                "sender_email": getattr(settings, 'sender_email', None),
+                "smtp_server": getattr(settings, 'smtp_server', None),
+                "smtp_port": getattr(settings, 'smtp_port', None),
+                "gmail_sender_email": getattr(settings, 'gmail_sender_email', None),
+                "gmail_app_password": getattr(settings, 'gmail_app_password', None)
+            }
+            
+            return authentication_factory.create_with_fallback(
+                primary_provider=AuthenticationProvider.MICROSOFT_OAUTH,
+                fallback_providers=[AuthenticationProvider.GMAIL_APP_PASSWORD],
+                config=config
+            )
+        else:
+            # Legacy configuration fallback
+            # Configure Microsoft OAuth from legacy config
+            microsoft_config = {
+                "tenant_id": TENANT_ID,
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+                "sender_email": SENDER_EMAIL,
+                "smtp_server": SMTP_SERVER,
+                "smtp_port": SMTP_PORT
+            }
+            
+            return authentication_factory.create_with_fallback(
+                primary_provider=AuthenticationProvider.MICROSOFT_OAUTH,
+                fallback_providers=[AuthenticationProvider.GMAIL_APP_PASSWORD],
+                config=microsoft_config
+            )
+    except Exception as e:
+        print(f"✗ Failed to initialize authentication manager: {e}")
+        raise
+
+# Global authentication manager instance
+try:
+    auth_manager = create_authentication_manager()
+    print(f"✓ Authentication manager initialized with provider: {auth_manager.get_current_manager().provider.name}")
+except Exception as e:
+    print(f"Failed to initialize authentication manager: {e}")
+    auth_manager = None
 
 
 def get_oauth_string(username, access_token):
@@ -119,17 +188,28 @@ def get_first_name(contact_name):
     return "there"
 
 
-def send_email(recipient_email, first_name):
-    """Send email to a single recipient using OAuth 2.0 authentication"""
-    try:
-        # Create message
-        msg = MIMEMultipart()
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = recipient_email
-        msg["Subject"] = SUBJECT
+def send_email(recipient_email, first_name, max_retries=3):
+    """Send email to a single recipient using authentication manager with fallback.
+    
+    Args:
+        recipient_email: Email address to send to
+        first_name: Personalized first name for email
+        max_retries: Maximum number of retry attempts
+        
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    for attempt in range(max_retries):
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            sender_email = settings.sender_email if settings else "default@example.com"
+            msg["From"] = sender_email
+            msg["To"] = recipient_email
+            msg["Subject"] = SUBJECT
 
-        # Email body with personalized first name
-        body = f"""Hi {first_name},
+            # Email body with personalized first name
+            body = f"""Hi {first_name},
 
 This is David from Honest Pharmco. We have a variety of high-quality cannabis available in sativa, indica, and hybrid strains, all with high THC percentages, including:
 B&C's
@@ -143,33 +223,134 @@ Please feel free to reach out with any questions or to discuss availability.
 Best,
 David"""
 
-        msg.attach(MIMEText(body, "plain"))
+            msg.attach(MIMEText(body, "plain"))
 
-        # Connect to SMTP server and send email with OAuth 2.0
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            # Authenticate and send email
+            success = _send_with_authentication(msg, recipient_email)
+            
+            if success:
+                print(f"✓ Email sent successfully to {recipient_email}")
+                return True
+            else:
+                # If authentication failed, try fallback on next attempt
+                if attempt < max_retries - 1:
+                    print(f"⚠ Attempt {attempt + 1} failed, retrying with fallback...")
+                    time.sleep(2)  # Brief delay before retry
+                    continue
+                    
+        except (AuthenticationError, TokenExpiredError, InvalidCredentialsError) as e:
+            print(f"✗ Authentication error for {recipient_email} (attempt {attempt + 1}): {e}")
+            if attempt < max_retries - 1:
+                print(f"⚠ Retrying with fallback authentication...")
+                time.sleep(2)
+                continue
+        except NetworkError as e:
+            print(f"✗ Network error for {recipient_email} (attempt {attempt + 1}): {e}")
+            if attempt < max_retries - 1:
+                print(f"⚠ Retrying due to network error...")
+                time.sleep(5)  # Longer delay for network issues
+                continue
+        except Exception as e:
+            print(f"✗ Unexpected error for {recipient_email} (attempt {attempt + 1}): {str(e)}")
+            if attempt < max_retries - 1:
+                print(f"⚠ Retrying due to unexpected error...")
+                time.sleep(2)
+                continue
+    
+    print(f"✗ Failed to send email to {recipient_email} after {max_retries} attempts")
+    return False
+
+
+def _send_with_authentication(msg, recipient_email):
+    """Send email using authentication manager with automatic fallback.
+    
+    Args:
+        msg: Email message to send
+        recipient_email: Recipient email address
+        
+    Returns:
+        bool: True if sent successfully, False otherwise
+        
+    Raises:
+        AuthenticationError: If authentication fails
+        NetworkError: If network connection fails
+    """
+    server = None
+    try:
+        # Check if auth_manager is available
+        if auth_manager is None:
+            raise AuthenticationError("Authentication manager not initialized", None)
+            
+        # Get authentication manager (with fallback capability)
+        current_manager = auth_manager.get_current_manager()
+        
+        # Ensure authentication
+        if not current_manager.is_authenticated:
+            success = current_manager.authenticate()
+            if not success:
+                # Try fallback if primary fails
+                fallback_manager = auth_manager.get_fallback_manager()
+                if fallback_manager and not fallback_manager.is_authenticated:
+                    fallback_success = fallback_manager.authenticate()
+                    if fallback_success:
+                        current_manager = fallback_manager
+                    else:
+                        raise AuthenticationError("Both primary and fallback authentication failed", current_manager.provider)
+                else:
+                    raise AuthenticationError("Primary authentication failed and no fallback available", current_manager.provider)
+        
+        # Get access token/credentials
+        access_token = current_manager.get_access_token()
+        
+        # Determine SMTP configuration based on provider
+        provider = current_manager.provider
+        if provider.name == "MICROSOFT_OAUTH":
+            smtp_server = settings.smtp_server if settings else "smtp.office365.com"
+            smtp_port = settings.smtp_port if settings else 587
+        elif provider.name == "GMAIL_APP_PASSWORD":
+            smtp_server = "smtp.gmail.com"
+            smtp_port = 587
+        else:
+            # Use default configuration
+            smtp_server = settings.smtp_server if settings else "smtp.office365.com"
+            smtp_port = settings.smtp_port if settings else 587
+        
+        # Connect to SMTP server
+        server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
-
-        # Get OAuth access token
-        access_token = token_manager.get_access_token()
-
-        # Generate OAuth string for SMTP
-        oauth_string = get_oauth_string(SENDER_EMAIL, access_token)
-
-        # Authenticate using XOAUTH2
-        auth_msg = f"\x00{SENDER_EMAIL}\x00{oauth_string}"
-        server.docmd("AUTH", "XOAUTH2 " + base64.b64encode(auth_msg.encode()).decode())
-
+        
+        # Authenticate based on provider type
+        sender_email = settings.sender_email if settings else "default@example.com"
+        if provider.name == "MICROSOFT_OAUTH":
+            # Use OAuth 2.0 authentication
+            oauth_string = get_oauth_string(sender_email, access_token)
+            auth_msg = f"\x00{sender_email}\x00{oauth_string}"
+            server.docmd("AUTH", "XOAUTH2 " + base64.b64encode(auth_msg.encode()).decode())
+        elif provider.name == "GMAIL_APP_PASSWORD":
+            # Use app password authentication
+            gmail_email = current_manager._config.get("gmail_sender_email", sender_email)
+            server.login(gmail_email, access_token)
+        else:
+            raise AuthenticationError(f"Unsupported authentication provider: {provider.name}", provider)
+        
         # Send email
         text = msg.as_string()
-        server.sendmail(SENDER_EMAIL, recipient_email, text)
-        server.quit()
-
-        print(f"✓ Email sent successfully to {recipient_email}")
+        server.sendmail(sender_email, recipient_email, text)
+        
         return True
-
-    except Exception as e:
-        print(f"✗ Failed to send email to {recipient_email}: {str(e)}")
-        return False
+        
+    except smtplib.SMTPAuthenticationError as e:
+        raise InvalidCredentialsError(f"SMTP authentication failed: {e}", current_manager.provider if 'current_manager' in locals() else None)
+    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected) as e:
+        raise NetworkError(f"SMTP connection failed: {e}", current_manager.provider if 'current_manager' in locals() else None)
+    except smtplib.SMTPException as e:
+        raise AuthenticationError(f"SMTP error: {e}", current_manager.provider if 'current_manager' in locals() else None)
+    finally:
+        if server:
+            try:
+                server.quit()
+            except:
+                pass  # Ignore errors when closing connection
 
 
 def read_contacts_from_csv(csv_file):
@@ -222,6 +403,11 @@ def send_batch_emails(contacts, start_index, batch_size):
 
 
 def main():
+    # Check if authentication manager is available
+    if auth_manager is None:
+        print("Authentication failed. Cannot proceed with email campaign.")
+        sys.exit(1)
+    
     # Read contacts from CSV
     csv_file = "tier_i_tier_ii_emails_verified.csv"
     contacts = read_contacts_from_csv(csv_file)

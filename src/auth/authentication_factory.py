@@ -22,9 +22,14 @@ class AuthenticationFactory:
     available credentials and configuration.
     """
 
-    def __init__(self):
-        """Initialize the authentication factory."""
+    def __init__(self, settings: Optional[Any] = None):
+        """Initialize the authentication factory.
+        
+        Args:
+            settings: Optional settings object for configuration
+        """
         self._providers: Dict[AuthenticationProvider, type] = {}
+        self._settings = settings
         self._logger = logging.getLogger(__name__)
 
     def register_provider(

@@ -148,7 +148,7 @@ def freeze_time_fixture():
 @pytest.fixture
 def oauth_token_manager():
     """Create an OAuthTokenManager instance for testing."""
-    from src.email_campaign import OAuthTokenManager
+    from src.auth import OAuthTokenManager
 
     return OAuthTokenManager()
 
@@ -157,6 +157,9 @@ def oauth_token_manager():
 @pytest.fixture
 def david_config_fixture():
     """Fixture that applies David's configuration for the test duration."""
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
     from tests.fixtures import apply_david_config, clear_david_config
 
     apply_david_config()
@@ -167,6 +170,9 @@ def david_config_fixture():
 @pytest.fixture
 def luke_config_fixture():
     """Fixture that applies Luke's configuration for the test duration."""
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
     from tests.fixtures import apply_luke_config, clear_luke_config
 
     apply_luke_config()
@@ -190,6 +196,6 @@ def isolated_config():
 @pytest.fixture
 def token_manager():
     """Alias for oauth_token_manager for backward compatibility."""
-    from src.email_campaign import OAuthTokenManager
+    from src.auth import OAuthTokenManager
 
     return OAuthTokenManager()
