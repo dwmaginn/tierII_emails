@@ -13,7 +13,7 @@ from .luke_config import get_luke_config, apply_luke_config, clear_luke_config
 
 __all__ = [
     "get_david_config",
-    "apply_david_config", 
+    "apply_david_config",
     "clear_david_config",
     "get_luke_config",
     "apply_luke_config",

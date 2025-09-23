@@ -7,8 +7,11 @@ import sys
 try:
     from config import SENDER_EMAIL, SENDER_PASSWORD, SMTP_SERVER, SMTP_PORT
 except ImportError:
-    print("Error: config.py file not found. Please ensure config.py exists with your email credentials.")
+    print(
+        "Error: config.py file not found. Please ensure config.py exists with your email credentials."
+    )
     sys.exit(1)
+
 
 def test_smtp_settings(server, port):
     """Test specific SMTP settings"""
@@ -25,9 +28,9 @@ def test_smtp_settings(server, port):
 
         # Try to send a test email
         msg = MIMEMultipart()
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = SENDER_EMAIL
-        msg['Subject'] = "SMTP Test - Connection Verified"
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = SENDER_EMAIL
+        msg["Subject"] = "SMTP Test - Connection Verified"
 
         body = f"""SMTP Test successful!
 Server: {server}:{port}
@@ -36,7 +39,7 @@ Time: Connection test completed successfully.
 
 This confirms your email settings work with these SMTP parameters."""
 
-        msg.attach(MIMEText(body, 'plain'))
+        msg.attach(MIMEText(body, "plain"))
 
         server_conn.sendmail(SENDER_EMAIL, SENDER_EMAIL, msg.as_string())
         server_conn.quit()
@@ -54,24 +57,25 @@ This confirms your email settings work with these SMTP parameters."""
         print(f"❌ ERROR: {str(e)}")
         return False
 
+
 def main():
-    print("="*80)
+    print("=" * 80)
     print("MICROSOFT 365 SMTP TROUBLESHOOTING TEST")
-    print("="*80)
+    print("=" * 80)
     print("Testing different SMTP configurations for Microsoft 365...")
 
     # Test current settings first
     if test_smtp_settings(SMTP_SERVER, SMTP_PORT):
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("✅ PRIMARY CONFIGURATION WORKS!")
         print("You can proceed with the email campaign.")
-        print("="*80)
+        print("=" * 80)
         return
 
     # Try alternative Microsoft 365 SMTP settings
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("Trying alternative Microsoft 365 SMTP settings...")
-    print("="*80)
+    print("=" * 80)
 
     alternative_settings = [
         ("smtp-mail.outlook.com", 587),
@@ -79,7 +83,7 @@ def main():
         ("smtp.office365.com", 587),
         ("smtp.office365.com", 465),
         ("outlook.office365.com", 587),
-        ("outlook.office365.com", 465)
+        ("outlook.office365.com", 465),
     ]
 
     working_config = None
@@ -88,7 +92,7 @@ def main():
             working_config = (server, port)
             break
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     if working_config:
         server, port = working_config
         print("✅ ALTERNATIVE CONFIGURATION FOUND!")
@@ -96,35 +100,38 @@ def main():
         print(f"Working SMTP Port: {port}")
         print("\nUpdate your config.py file with these settings:")
         print(f'SMTP_SERVER = "{server}"')
-        print(f'SMTP_PORT = {port}')
+        print(f"SMTP_PORT = {port}")
     else:
         print("❌ NO WORKING CONFIGURATION FOUND")
         print("\nTroubleshooting steps:")
         print("1. Check if your Microsoft 365 account has 2FA enabled")
-        print("2. If 2FA is enabled, create an 'App Password' in your Microsoft account")
+        print(
+            "2. If 2FA is enabled, create an 'App Password' in your Microsoft account"
+        )
         print("3. Verify your password is correct")
         print("4. Check if your account has SMTP restrictions")
         print("5. Try logging into https://outlook.com with your credentials")
-    print("="*80)
+    print("=" * 80)
+
 
 def main():
-    print("="*80)
+    print("=" * 80)
     print("MICROSOFT 365 SMTP TROUBLESHOOTING TEST")
-    print("="*80)
+    print("=" * 80)
     print("Testing different SMTP configurations for Microsoft 365...")
 
     # Test current settings first
     if test_smtp_settings(SMTP_SERVER, SMTP_PORT):
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("✅ PRIMARY CONFIGURATION WORKS!")
         print("You can proceed with the email campaign.")
-        print("="*80)
+        print("=" * 80)
         return
 
     # Try alternative Microsoft 365 SMTP settings
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("Trying alternative Microsoft 365 SMTP settings...")
-    print("="*80)
+    print("=" * 80)
 
     alternative_settings = [
         ("smtp-mail.outlook.com", 587),
@@ -132,7 +139,7 @@ def main():
         ("smtp.office365.com", 587),
         ("smtp.office365.com", 465),
         ("outlook.office365.com", 587),
-        ("outlook.office365.com", 465)
+        ("outlook.office365.com", 465),
     ]
 
     working_config = None
@@ -141,7 +148,7 @@ def main():
             working_config = (server, port)
             break
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     if working_config:
         server, port = working_config
         print("✅ ALTERNATIVE CONFIGURATION FOUND!")
@@ -149,16 +156,19 @@ def main():
         print(f"Working SMTP Port: {port}")
         print("\nUpdate your config.py file with these settings:")
         print(f'SMTP_SERVER = "{server}"')
-        print(f'SMTP_PORT = {port}')
+        print(f"SMTP_PORT = {port}")
     else:
         print("❌ NO WORKING CONFIGURATION FOUND")
         print("\nTroubleshooting steps:")
         print("1. Check if your Microsoft 365 account has 2FA enabled")
-        print("2. If 2FA is enabled, create an 'App Password' in your Microsoft account")
+        print(
+            "2. If 2FA is enabled, create an 'App Password' in your Microsoft account"
+        )
         print("3. Verify your password is correct")
         print("4. Check if your account has SMTP restrictions")
         print("5. Try logging into https://outlook.com with your credentials")
-    print("="*80)
+    print("=" * 80)
+
 
 if __name__ == "__main__":
     main()

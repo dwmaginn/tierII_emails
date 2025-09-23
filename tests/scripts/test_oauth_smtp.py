@@ -11,16 +11,25 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import base64
 import requests
-import json
 from datetime import datetime, timedelta
 import sys
 
 # Import configuration
 try:
-    from config import SENDER_EMAIL, SMTP_SERVER, SMTP_PORT, TENANT_ID, CLIENT_ID, CLIENT_SECRET
+    from config import (
+        SENDER_EMAIL,
+        SMTP_SERVER,
+        SMTP_PORT,
+        TENANT_ID,
+        CLIENT_ID,
+        CLIENT_SECRET,
+    )
 except ImportError:
-    print("Error: config.py file not found. Please ensure config.py exists with your OAuth credentials.")
+    print(
+        "Error: config.py file not found. Please ensure config.py exists with your OAuth credentials."
+    )
     sys.exit(1)
+
 
 class OAuthTokenManager:
     def __init__(self):
@@ -30,16 +39,20 @@ class OAuthTokenManager:
 
     def get_access_token(self):
         """Get a valid access token, refreshing if necessary"""
-        if self.access_token and self.token_expiry and datetime.now() < self.token_expiry:
+        if (
+            self.access_token
+            and self.token_expiry
+            and datetime.now() < self.token_expiry
+        ):
             return self.access_token
 
         # Request new token
         token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
         token_data = {
-            'client_id': CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
-            'scope': self.scope,
-            'grant_type': 'client_credentials'
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "scope": self.scope,
+            "grant_type": "client_credentials",
         }
 
         try:
@@ -47,9 +60,9 @@ class OAuthTokenManager:
             response.raise_for_status()
             token_response = response.json()
 
-            self.access_token = token_response['access_token']
+            self.access_token = token_response["access_token"]
             # Set expiry to 5 minutes before actual expiry for safety
-            expires_in = token_response.get('expires_in', 3600) - 300
+            expires_in = token_response.get("expires_in", 3600) - 300
             self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
 
             print("✓ OAuth token obtained successfully")
@@ -57,24 +70,26 @@ class OAuthTokenManager:
 
         except requests.exceptions.RequestException as e:
             print(f"✗ Failed to obtain OAuth token: {e}")
-            if hasattr(e, 'response') and e.response:
+            if hasattr(e, "response") and e.response:
                 print(f"Response status: {e.response.status_code}")
                 print(f"Response body: {e.response.text}")
             raise
+
 
 def get_oauth_string(username, access_token):
     """Generate OAuth string for SMTP authentication"""
     auth_string = f"user={username}\x01auth=Bearer {access_token}\x01\x01"
     return base64.b64encode(auth_string.encode()).decode()
 
+
 def test_oauth_smtp():
     """Test OAuth SMTP connection and authentication"""
     token_manager = OAuthTokenManager()
 
     try:
-        print("="*80)
+        print("=" * 80)
         print("TESTING OAUTH 2.0 SMTP AUTHENTICATION")
-        print("="*80)
+        print("=" * 80)
         print(f"SMTP Server: {SMTP_SERVER}:{SMTP_PORT}")
         print(f"Email: {SENDER_EMAIL}")
         print()
@@ -112,7 +127,9 @@ def test_oauth_smtp():
         try:
             oauth_string = get_oauth_string(SENDER_EMAIL, access_token)
             auth_msg = f"\x00{SENDER_EMAIL}\x00{oauth_string}"
-            server.docmd("AUTH", "XOAUTH2 " + base64.b64encode(auth_msg.encode()).decode())
+            server.docmd(
+                "AUTH", "XOAUTH2 " + base64.b64encode(auth_msg.encode()).decode()
+            )
             print("✓ OAuth authentication successful")
         except Exception as e:
             print(f"✗ OAuth authentication failed: {e}")
@@ -123,9 +140,9 @@ def test_oauth_smtp():
         print("\nStep 5: Sending test email...")
         try:
             msg = MIMEMultipart()
-            msg['From'] = SENDER_EMAIL
-            msg['To'] = SENDER_EMAIL  # Send to self for testing
-            msg['Subject'] = "OAuth SMTP Test - Connection Verified"
+            msg["From"] = SENDER_EMAIL
+            msg["To"] = SENDER_EMAIL  # Send to self for testing
+            msg["Subject"] = "OAuth SMTP Test - Connection Verified"
 
             body = f"""OAuth SMTP Test successful!
 
@@ -136,7 +153,7 @@ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 This confirms your OAuth 2.0 SMTP configuration is working correctly!
 You can now proceed with your email campaign."""
 
-            msg.attach(MIMEText(body, 'plain'))
+            msg.attach(MIMEText(body, "plain"))
 
             server.sendmail(SENDER_EMAIL, SENDER_EMAIL, msg.as_string())
             server.quit()
@@ -146,16 +163,17 @@ You can now proceed with your email campaign."""
             server.quit()
             return False
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("✅ ALL TESTS PASSED!")
         print("Your OAuth 2.0 SMTP configuration is working correctly.")
         print("You can now proceed with your email campaign.")
-        print("="*80)
+        print("=" * 80)
         return True
 
     except Exception as e:
         print(f"\n✗ Test failed with error: {e}")
         return False
+
 
 def main():
     print("OAuth 2.0 SMTP Test for Microsoft 365")
@@ -184,11 +202,14 @@ def main():
     if not success:
         print("\n❌ OAuth SMTP test failed!")
         print("\nTroubleshooting steps:")
-        print("1. Verify SMTP AUTH is enabled for your mailbox in Microsoft 365 admin center")
+        print(
+            "1. Verify SMTP AUTH is enabled for your mailbox in Microsoft 365 admin center"
+        )
         print("2. Check your Azure AD app registration and permissions")
         print("3. Ensure API permissions are granted with admin consent")
         print("4. Verify your credentials in config.py are correct")
         print("5. Make sure your tenant ID, client ID, and client secret are accurate")
+
 
 if __name__ == "__main__":
     main()

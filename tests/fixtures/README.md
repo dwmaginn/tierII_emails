@@ -53,7 +53,7 @@ clear_luke_config()
 ```
 
 **Configuration Details:**
-- **Email**: `luke@aiautocoach.com`
+- **Email**: `edwards.lukec@gmail.com`
 - **SMTP Server**: `smtp.gmail.com`
 - **Auth Provider**: `gmail`
 - **Test Data**: Points to `testdata.csv`
