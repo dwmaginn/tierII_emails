@@ -59,10 +59,17 @@ class TierIISettings(BaseSettings):
     smtp_server: str = Field(..., alias="TIERII_SMTP_SERVER")
     smtp_port: int = Field(587, alias="TIERII_SMTP_PORT")
     
-    # OAuth 2.0 Configuration (Required)
-    tenant_id: str = Field(..., alias="TIERII_TENANT_ID")
-    client_id: str = Field(..., alias="TIERII_CLIENT_ID")
-    client_secret: str = Field(..., alias="TIERII_CLIENT_SECRET")
+    # Authentication Configuration
+    auth_provider: str = Field("microsoft", alias="TIERII_AUTH_PROVIDER")
+    
+    # OAuth 2.0 Configuration (Microsoft)
+    tenant_id: Optional[str] = Field(None, alias="TIERII_TENANT_ID")
+    client_id: Optional[str] = Field(None, alias="TIERII_CLIENT_ID")
+    client_secret: Optional[str] = Field(None, alias="TIERII_CLIENT_SECRET")
+    
+    # Gmail SMTP Configuration
+    gmail_username: Optional[str] = Field(None, alias="TIERII_GMAIL_USERNAME")
+    gmail_app_password: Optional[str] = Field(None, alias="TIERII_GMAIL_APP_PASSWORD")
     
     # Email Content Configuration
     email_subject: str = Field(..., alias="TIERII_EMAIL_SUBJECT")

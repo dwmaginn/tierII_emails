@@ -143,6 +143,37 @@ def oauth_token_manager():
         client_secret='test-client-secret'
     )
 
+# Configuration workflow fixtures
+@pytest.fixture
+def david_config_fixture():
+    """Fixture that applies David's configuration for the test duration."""
+    from tests.fixtures import apply_david_config, clear_david_config
+    
+    apply_david_config()
+    yield
+    clear_david_config()
+
+@pytest.fixture
+def luke_config_fixture():
+    """Fixture that applies Luke's configuration for the test duration."""
+    from tests.fixtures import apply_luke_config, clear_luke_config
+    
+    apply_luke_config()
+    yield
+    clear_luke_config()
+
+@pytest.fixture
+def isolated_config():
+    """Fixture that ensures clean environment isolation between tests."""
+    # Store original environment
+    original_env = dict(os.environ)
+    
+    yield
+    
+    # Restore original environment
+    os.environ.clear()
+    os.environ.update(original_env)
+
 @pytest.fixture
 def token_manager():
     """Alias for oauth_token_manager for backward compatibility."""
