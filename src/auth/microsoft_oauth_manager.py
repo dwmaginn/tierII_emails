@@ -342,6 +342,8 @@ class MicrosoftOAuthManager(BaseAuthenticationManager):
             "msn.com",
             "office365.com",
             "microsoft.com",
+            "aiautocoach.com",
+            "honestpharmco.com"
         }
 
         # Check exact match first
