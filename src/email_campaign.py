@@ -11,8 +11,8 @@ import logging
 import os
 
 # Import authentication components
-from auth.authentication_factory import authentication_factory
-from auth.base_authentication_manager import (
+from src.auth.authentication_factory import authentication_factory
+from src.auth.base_authentication_manager import (
     AuthenticationError,
     TokenExpiredError,
     InvalidCredentialsError,
@@ -25,7 +25,7 @@ from auth.base_authentication_manager import (
 
 # Import settings for authentication configuration
 try:
-    from config.settings import TierIISettings
+    from src.config.settings import TierIISettings
     settings = TierIISettings()
 except ImportError:
     print(
@@ -101,13 +101,14 @@ def create_authentication_manager():
         if settings:
             # Configure from settings
             config = {
-                "tenant_id": getattr(settings, 'microsoft_tenant_id', None),
-                "client_id": getattr(settings, 'microsoft_client_id', None),
-                "client_secret": getattr(settings, 'microsoft_client_secret', None),
+                "tenant_id": getattr(settings, 'tenant_id', None),
+                "client_id": getattr(settings, 'client_id', None),
+                "client_secret": getattr(settings, 'client_secret', None),
                 "sender_email": getattr(settings, 'sender_email', None),
                 "smtp_server": getattr(settings, 'smtp_server', None),
                 "smtp_port": getattr(settings, 'smtp_port', None),
-                "gmail_sender_email": getattr(settings, 'gmail_sender_email', None),
+                "gmail_sender_email": getattr(settings, 'sender_email', None),
+                "gmail_username": getattr(settings, 'gmail_username', None),
                 "gmail_app_password": getattr(settings, 'gmail_app_password', None)
             }
             
@@ -140,7 +141,7 @@ def create_authentication_manager():
 # Global authentication manager instance
 try:
     auth_manager = create_authentication_manager()
-    print(f"✓ Authentication manager initialized with provider: {auth_manager.get_current_manager().provider.name}")
+    print(f"✓ Authentication manager initialized with provider: {auth_manager.provider.name}")
 except Exception as e:
     print(f"Failed to initialize authentication manager: {e}")
     auth_manager = None
@@ -282,7 +283,7 @@ def _send_with_authentication(msg, recipient_email):
             raise AuthenticationError("Authentication manager not initialized", None)
             
         # Get authentication manager (with fallback capability)
-        current_manager = auth_manager.get_current_manager()
+        current_manager = auth_manager
         
         # Ensure authentication
         if not current_manager.is_authenticated:
