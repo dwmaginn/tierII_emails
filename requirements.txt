@@ -1,0 +1,40 @@
+# Email Campaign Dependencies
+# Core Python packages for email functionality and OAuth authentication
+
+# HTTP requests for OAuth token management
+requests>=2.28.0
+
+# Email handling (built into Python standard library, but listed for clarity)
+# smtplib - included in Python standard library
+# email - included in Python standard library
+
+# CSV handling (built into Python standard library)
+# csv - included in Python standard library
+
+# Date and time handling (built into Python standard library)
+# datetime - included in Python standard library
+
+# Base64 encoding for OAuth (built into Python standard library)
+# base64 - included in Python standard library
+
+# JSON handling (built into Python standard library)
+# json - included in Python standard library
+
+# System and OS utilities (built into Python standard library)
+# sys - included in Python standard library
+# os - included in Python standard library
+# time - included in Python standard library
+
+# Optional: For enhanced CSV handling and data analysis
+# pandas>=1.5.0  # Uncomment if you want to add data analysis features
+
+# Optional: For enhanced logging
+# colorama>=0.4.6  # Uncomment if you want colored console output
+
+# Optional: For configuration file handling
+# python-dotenv>=0.19.0  # Uncomment if you want to use .env files for configuration
+
+# Development dependencies (uncomment for development)
+# pytest>=7.0.0  # For unit testing
+# black>=22.0.0  # For code formatting
+# flake8>=4.0.0  # For code linting
