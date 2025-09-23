@@ -75,8 +75,9 @@ def get_first_name(contact_name):
     name_parts = contact_name.split()
     if name_parts:
         first_name = name_parts[0].strip()
-        # Remove common titles
-        titles = ['mr', 'mrs', 'ms', 'dr', 'prof', 'rev', 'sir', 'madam']
+        # Remove common titles (with and without periods)
+        titles = ['mr', 'mrs', 'ms', 'dr', 'prof', 'rev', 'sir', 'madam',
+                 'mr.', 'mrs.', 'ms.', 'dr.', 'prof.', 'rev.', 'sir.', 'madam.']
         first_name_lower = first_name.lower()
         if first_name_lower in titles:
             return name_parts[1].strip() if len(name_parts) > 1 else "there"
