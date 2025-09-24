@@ -27,22 +27,11 @@ class TestEmailCampaignFullWorkflow:
     """Integration tests for complete email campaign workflow."""
 
     @pytest.fixture
-    def mock_config_microsoft(self):
-        """Mock configuration for Microsoft OAuth."""
+    def mock_config_mailersend(self):
+        """Mock configuration for MailerSend."""
         return {
-            "microsoft_client_id": "test_client_id",
-            "microsoft_client_secret": "test_client_secret",
-            "microsoft_tenant_id": "test_tenant_id",
+            "mailersend_api_token": "test_api_token",
             "sender_email": "test@company.com",
-            "sender_name": "Test Sender"
-        }
-
-    @pytest.fixture
-    def mock_config_gmail(self):
-        """Mock configuration for Gmail App Password."""
-        return {
-            "gmail_sender_email": "test@gmail.com",
-            "gmail_app_password": "test_app_password",
             "sender_name": "Test Sender"
         }
 
@@ -56,18 +45,18 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.auth_manager")
-    @patch("src.email_campaign.create_authentication_manager")
-    @patch("src.email_campaign.send_email")
-    @patch("src.email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.auth_manager")
+    @patch("email_campaign.create_authentication_manager")
+    @patch("email_campaign.send_email")
+    @patch("email_campaign.read_contacts_from_csv")
     @patch("builtins.input")
-    def test_full_workflow_microsoft_oauth_dry_run(self, mock_input, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
-        """Test full workflow with Microsoft OAuth in dry run mode."""
-        from src.email_campaign import main
+    def test_full_workflow_mailersend_dry_run(self, mock_input, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
+        """Test full workflow with MailerSend in dry run mode."""
+        from email_campaign import main
 
         # Setup authentication manager
         mock_manager = Mock()
-        mock_manager.provider.name = "MICROSOFT_OAUTH"
+        mock_manager.provider.name = "MAILERSEND"
         mock_auth_factory = Mock()
         mock_auth_factory.get_current_manager.return_value = mock_manager
         mock_create_auth.return_value = mock_auth_factory
@@ -95,19 +84,25 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.auth_manager")
-    @patch("src.email_campaign.create_authentication_manager")
-    @patch("src.email_campaign.send_email")
-    @patch("src.email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.auth_manager")
+    @patch("email_campaign.create_authentication_manager")
+    @patch("email_campaign.send_email")
+    @patch("email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.settings")
     @patch("builtins.input")
     @patch("time.sleep")  # Mock sleep to speed up test
-    def test_full_workflow_gmail_full_campaign(self, mock_sleep, mock_input, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
-        """Test full workflow with Gmail App Password for full campaign."""
-        from src.email_campaign import main
+    def test_full_workflow_mailersend_full_campaign(self, mock_sleep, mock_input, mock_settings, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
+        """Test full workflow with MailerSend for full campaign."""
+        from email_campaign import main
+
+        # Setup settings with test recipient email
+        mock_settings.test_recipient_email = "test@example.com"
+        mock_settings.test_fallback_first_name = "Test"
+        mock_settings.test_csv_filename = "test.csv"
 
         # Setup authentication manager
         mock_manager = Mock()
-        mock_manager.provider.name = "GMAIL_APP_PASSWORD"
+        mock_manager.provider.name = "MAILERSEND"
         mock_auth_factory = Mock()
         mock_auth_factory.get_current_manager.return_value = mock_manager
         mock_create_auth.return_value = mock_auth_factory
@@ -132,19 +127,13 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.create_authentication_manager")
-    @patch("src.email_campaign.send_email")
-    @patch("src.email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.auth_manager", None)
+    @patch("email_campaign.send_email")
+    @patch("email_campaign.read_contacts_from_csv")
     @patch("builtins.input")
-    def test_full_workflow_authentication_failure(self, mock_input, mock_read_contacts, mock_send_email, mock_create_auth):
+    def test_full_workflow_authentication_failure(self, mock_input, mock_read_contacts, mock_send_email):
         """Test full workflow when authentication fails."""
-        from src.email_campaign import main
-
-        # Setup authentication manager to fail
-        mock_create_auth.side_effect = AuthenticationError(
-            "Authentication failed", 
-            AuthenticationProvider.MICROSOFT_OAUTH
-        )
+        from email_campaign import main
 
         # Setup contacts
         mock_read_contacts.return_value = [
@@ -160,22 +149,22 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.auth_manager")
-    @patch("src.email_campaign.create_authentication_manager")
-    @patch("src.email_campaign.send_email")
-    @patch("src.email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.auth_manager")
+    @patch("email_campaign.create_authentication_manager")
+    @patch("email_campaign.send_email")
+    @patch("email_campaign.read_contacts_from_csv")
     @patch("builtins.input")
     def test_full_workflow_fallback_mechanism(self, mock_input, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
         """Test full workflow with fallback authentication."""
-        from src.email_campaign import main
+        from email_campaign import main
 
         # Setup authentication factory with fallback
         mock_primary = Mock()
-        mock_primary.provider.name = "MICROSOFT_OAUTH"
+        mock_primary.provider.name = "MAILERSEND"
         mock_primary.is_authenticated = False
         
         mock_fallback = Mock()
-        mock_fallback.provider.name = "GMAIL_APP_PASSWORD"
+        mock_fallback.provider.name = "MAILERSEND"
         mock_fallback.is_authenticated = True
         
         mock_auth_factory = Mock()
@@ -202,18 +191,24 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.auth_manager")
-    @patch("src.email_campaign.create_authentication_manager")
-    @patch("src.email_campaign.send_email")
-    @patch("src.email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.auth_manager")
+    @patch("email_campaign.create_authentication_manager")
+    @patch("email_campaign.send_email")
+    @patch("email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.settings")
     @patch("builtins.input")
-    def test_full_workflow_partial_send_failure(self, mock_input, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
+    def test_full_workflow_partial_send_failure(self, mock_input, mock_settings, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
         """Test full workflow when some emails fail to send."""
-        from src.email_campaign import main
+        from email_campaign import main
+
+        # Setup settings with test recipient email
+        mock_settings.test_recipient_email = "test@example.com"
+        mock_settings.test_fallback_first_name = "Test"
+        mock_settings.test_csv_filename = "test.csv"
 
         # Setup authentication manager
         mock_manager = Mock()
-        mock_manager.provider.name = "MICROSOFT_OAUTH"
+        mock_manager.provider.name = "MAILERSEND"
         mock_auth_factory = Mock()
         mock_auth_factory.get_current_manager.return_value = mock_manager
         mock_create_auth.return_value = mock_auth_factory
@@ -239,12 +234,12 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.auth_manager")
-    @patch("src.email_campaign.create_authentication_manager")
-    @patch("src.email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.auth_manager")
+    @patch("email_campaign.create_authentication_manager")
+    @patch("email_campaign.read_contacts_from_csv")
     def test_full_workflow_csv_read_failure(self, mock_read_contacts, mock_create_auth, mock_auth_manager):
         """Test full workflow when CSV reading fails."""
-        from src.email_campaign import main
+        from email_campaign import main
 
         # Setup authentication manager
         mock_manager = Mock()
@@ -261,19 +256,25 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.auth_manager")
-    @patch("src.email_campaign.create_authentication_manager")
-    @patch("src.email_campaign.send_email")
-    @patch("src.email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.auth_manager")
+    @patch("email_campaign.create_authentication_manager")
+    @patch("email_campaign.send_email")
+    @patch("email_campaign.read_contacts_from_csv")
+    @patch("email_campaign.settings")
     @patch("builtins.input")
     @patch("time.sleep")  # Mock sleep to speed up test
-    def test_full_workflow_batch_processing(self, mock_sleep, mock_input, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
+    def test_full_workflow_batch_processing(self, mock_sleep, mock_input, mock_settings, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
         """Test full workflow with batch processing and delays."""
-        from src.email_campaign import main
+        from email_campaign import main
+
+        # Setup settings with test recipient email
+        mock_settings.test_recipient_email = "test@example.com"
+        mock_settings.test_fallback_first_name = "Test"
+        mock_settings.test_csv_filename = "test.csv"
 
         # Setup authentication manager
         mock_manager = Mock()
-        mock_manager.provider.name = "MICROSOFT_OAUTH"
+        mock_manager.provider.name = "MAILERSEND"
         mock_auth_factory = Mock()
         mock_auth_factory.get_current_manager.return_value = mock_manager
         mock_create_auth.return_value = mock_auth_factory
@@ -306,62 +307,64 @@ class TestEmailCampaignConfigurationIntegration:
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.config.settings.TierIISettings")
-    @patch("src.email_campaign.authentication_factory")
+    @patch("config.settings.TierIISettings")
+    @patch("email_campaign.authentication_factory")
     def test_create_authentication_manager_with_settings(self, mock_auth_factory, mock_settings):
         """Test authentication manager creation with TierIISettings."""
-        from src.email_campaign import create_authentication_manager
+        from email_campaign import create_authentication_manager
 
         # Setup mock settings
         mock_settings_instance = Mock()
-        mock_settings_instance.microsoft_client_id = "test_client_id"
-        mock_settings_instance.microsoft_client_secret = "test_client_secret"
-        mock_settings_instance.microsoft_tenant_id = "test_tenant_id"
+        mock_settings_instance.mailersend_api_token = "test_api_token"
         mock_settings_instance.sender_email = "test@company.com"
         mock_settings.return_value = mock_settings_instance
 
         # Setup mock factory
         mock_factory_instance = Mock()
-        mock_auth_factory.create_with_fallback.return_value = mock_factory_instance
+        mock_auth_factory.create_manager.return_value = mock_factory_instance
 
         # Test
         result = create_authentication_manager()
 
-        # Verify factory was called with correct providers
-        mock_auth_factory.create_with_fallback.assert_called_once()
+        # Verify factory was called with MailerSend provider
+        mock_auth_factory.create_manager.assert_called_once()
+        call_args = mock_auth_factory.create_manager.call_args
+        assert call_args[1]['provider'] == AuthenticationProvider.MAILERSEND
         assert result == mock_factory_instance
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.config.settings.TierIISettings")
-    @patch("src.email_campaign.authentication_factory")
+    @patch("config.settings.TierIISettings")
+    @patch("email_campaign.authentication_factory")
     def test_create_authentication_manager_settings_fallback(self, mock_auth_factory, mock_settings):
         """Test authentication manager creation with settings import failure."""
-        from src.email_campaign import create_authentication_manager
+        from email_campaign import create_authentication_manager
 
         # Setup settings import to fail
         mock_settings.side_effect = ImportError("Settings not found")
 
         # Setup mock factory
         mock_factory_instance = Mock()
-        mock_auth_factory.create_with_fallback.return_value = mock_factory_instance
+        mock_auth_factory.create_manager.return_value = mock_factory_instance
 
         # Test
         result = create_authentication_manager()
 
-        # Verify factory was called with legacy config
-        mock_auth_factory.create_with_fallback.assert_called_once()
+        # Verify factory was called with MailerSend provider
+        mock_auth_factory.create_manager.assert_called_once()
+        call_args = mock_auth_factory.create_manager.call_args
+        assert call_args[1]['provider'] == AuthenticationProvider.MAILERSEND
         assert result == mock_factory_instance
 
     @pytest.mark.integration
     @pytest.mark.email
-    @patch("src.email_campaign.authentication_factory")
+    @patch("email_campaign.authentication_factory")
     def test_create_authentication_manager_factory_failure(self, mock_auth_factory):
         """Test authentication manager creation when factory creation fails."""
-        from src.email_campaign import create_authentication_manager
+        from email_campaign import create_authentication_manager
 
         # Setup factory to fail
-        mock_auth_factory.create_with_fallback.side_effect = Exception("Factory creation failed")
+        mock_auth_factory.create_manager.side_effect = Exception("Factory creation failed")
 
         # Test should raise exception
         with pytest.raises(Exception, match="Factory creation failed"):
@@ -370,23 +373,21 @@ class TestEmailCampaignConfigurationIntegration:
     @pytest.mark.integration
     @pytest.mark.email
     @patch("src.config.settings.TierIISettings")
-    @patch("src.email_campaign.authentication_factory")
+    @patch("email_campaign.authentication_factory")
     def test_create_authentication_manager_missing_credentials(self, mock_auth_factory, mock_settings):
         """Test authentication manager creation with missing credentials."""
-        from src.email_campaign import create_authentication_manager
+        from email_campaign import create_authentication_manager
 
         # Setup mock settings with missing credentials
         mock_settings_instance = Mock()
-        mock_settings_instance.microsoft_client_id = None
-        mock_settings_instance.microsoft_client_secret = None
-        mock_settings_instance.microsoft_tenant_id = None
+        mock_settings_instance.mailersend_api_token = None
         mock_settings_instance.sender_email = None
         mock_settings.return_value = mock_settings_instance
 
         # Setup mock factory to raise authentication error
-        mock_auth_factory.create_with_fallback.side_effect = AuthenticationError(
+        mock_auth_factory.create_manager.side_effect = AuthenticationError(
             "Missing credentials", 
-            AuthenticationProvider.MICROSOFT_OAUTH
+            AuthenticationProvider.MAILERSEND
         )
 
         # Test should raise AuthenticationError

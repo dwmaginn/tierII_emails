@@ -1,8 +1,8 @@
 """Base authentication manager abstract class.
 
 Defines the common interface for all authentication providers in the tierII_emails system.
-This abstract class ensures consistent authentication behavior across Microsoft OAuth 2.0,
-Gmail App Password, and any future authentication providers.
+This abstract class ensures consistent authentication behavior across MailerSend API
+and any future authentication providers.
 """
 
 from abc import ABC, abstractmethod
@@ -14,8 +14,7 @@ from enum import Enum
 class AuthenticationProvider(Enum):
     """Enumeration of supported authentication providers."""
 
-    MICROSOFT_OAUTH = "microsoft_oauth"
-    GMAIL_APP_PASSWORD = "gmail_app_password"
+    MAILERSEND = "mailersend"
 
 
 class AuthenticationError(Exception):
@@ -91,7 +90,7 @@ class BaseAuthenticationManager(ABC):
 
     @abstractmethod
     def get_access_token(self) -> str:
-        """Get a valid access token for SMTP authentication.
+        """Get a valid access token for API authentication.
 
         This method should handle token refresh automatically if the current
         token is expired or about to expire.
@@ -123,21 +122,6 @@ class BaseAuthenticationManager(ABC):
 
         Raises:
             AuthenticationError: If token refresh fails
-        """
-        pass
-
-    @abstractmethod
-    def get_smtp_auth_string(self, username: str) -> str:
-        """Generate SMTP authentication string for the provider.
-
-        Args:
-            username: The username/email for SMTP authentication
-
-        Returns:
-            Provider-specific SMTP authentication string
-
-        Raises:
-            AuthenticationError: If unable to generate auth string
         """
         pass
 

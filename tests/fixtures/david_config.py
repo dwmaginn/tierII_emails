@@ -1,7 +1,7 @@
-"""Test fixture for David's Microsoft OAuth configuration.
+"""Test fixture for David's MailerSend configuration.
 
 This fixture provides a complete configuration setup for testing David's
-Microsoft 365 OAuth 2.0 email workflow with test data.
+MailerSend email workflow with test data.
 """
 
 import os
@@ -9,7 +9,7 @@ from typing import Dict, Any
 
 
 def get_david_config() -> Dict[str, Any]:
-    """Get David's Microsoft OAuth configuration for testing.
+    """Get David's MailerSend configuration for testing.
 
     Returns:
         Dict containing all environment variables for David's setup
@@ -18,24 +18,16 @@ def get_david_config() -> Dict[str, Any]:
     return {
         # Core Email Configuration
         "TIERII_SENDER_EMAIL": "david@honestpharmco.com",
-        "TIERII_SMTP_SERVER": "smtp.office365.com",
-        "TIERII_SMTP_PORT": "587",
-        # Authentication Configuration
-        "TIERII_AUTH_PROVIDER": "microsoft",
-        # Microsoft OAuth 2.0 Configuration
-        "TIERII_TENANT_ID": "test-tenant-id-david",
-        "TIERII_CLIENT_ID": "test-client-id-david",
-        "TIERII_CLIENT_SECRET": "test-client-secret-david",
-        # Email Content Configuration
-        "TIERII_EMAIL_SUBJECT": "High-Quality Cannabis Available - Honest Pharmco",
-        "TIERII_SMTP_SENDER_NAME": "David from Honest Pharmco",
-        # Test-specific Configuration
+        # MailerSend Configuration
+        "TIERII_MAILERSEND_API_TOKEN": "test-api-token-david",
+        "TIERII_SENDER_NAME": "David from Honest Pharmco",
+        # Campaign Configuration
+        "TIERII_CAMPAIGN_BATCH_SIZE": "10",
+        "TIERII_CAMPAIGN_DELAY_MINUTES": "1",
+        # Test Configuration
         "TIERII_TEST_RECIPIENT_EMAIL": "test@example.com",
-        "TIERII_CSV_FILE_PATH": "c:/Users/73spi/Work/tierII_emails/data/test/testdata.csv",
-        # Optional Configuration
-        "TIERII_BATCH_SIZE": "10",
-        "TIERII_DELAY_MINUTES": "1",
-        "TIERII_DRY_RUN": "true",  # Prevent actual email sending in tests
+        "TIERII_TEST_CSV_FILENAME": "data/test/testdata.csv",
+        "TIERII_TEST_FALLBACK_FIRST_NAME": "Friend",
     }
 
 
@@ -43,7 +35,7 @@ def apply_david_config() -> None:
     """Apply David's configuration to environment variables.
 
     This function sets all environment variables needed for David's
-    Microsoft OAuth setup during testing.
+    MailerSend setup during testing.
     """
     config = get_david_config()
     for key, value in config.items():

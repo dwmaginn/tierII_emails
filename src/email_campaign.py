@@ -1,162 +1,114 @@
 import csv
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import time
 import sys
-import base64
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 import logging
-import os
 
-# Import authentication components
-from src.auth.authentication_factory import authentication_factory
-from src.auth.base_authentication_manager import (
+# Import authentication components for MailerSend only
+from auth.authentication_factory import authentication_factory
+from auth.base_authentication_manager import (
     AuthenticationError,
-    TokenExpiredError,
-    InvalidCredentialsError,
     NetworkError,
     AuthenticationProvider
 )
 
-# Import configuration from new settings module
-# Legacy config.py has been replaced with config/settings.py
+# Import configuration from settings module
+from config.settings import load_settings
 
-# Import settings for authentication configuration
+# Load settings
 try:
-    from src.config.settings import TierIISettings
-    settings = TierIISettings()
-except ImportError:
-    print(
-        "Warning: settings.py not found. Using legacy configuration."
-    )
-    settings = None
-
-# Legacy configuration fallback
-TENANT_ID = os.getenv('TENANT_ID')
-CLIENT_ID = os.getenv('CLIENT_ID')
-CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-SENDER_EMAIL = os.getenv('SENDER_EMAIL')
-SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.office365.com')
-SMTP_PORT = os.getenv('SMTP_PORT', '587')
+    settings = load_settings()
+except Exception as e:
+    print(f"Error loading settings: {e}")
+    sys.exit(1)
 
 # Campaign configuration
-if settings:
-    BATCH_SIZE = settings.campaign_batch_size
-    DELAY_MINUTES = settings.campaign_delay_minutes
-else:
-    BATCH_SIZE = int(os.getenv('TIERII_CAMPAIGN_BATCH_SIZE', '10'))
-    DELAY_MINUTES = int(os.getenv('TIERII_CAMPAIGN_DELAY_MINUTES', '5'))
+BATCH_SIZE = settings.campaign_batch_size
+DELAY_MINUTES = settings.campaign_delay_minutes
 
-# Email template
+# Email subject
 SUBJECT = "High-Quality Cannabis Available - Honest Pharmco"
 
 
 class EmailCampaign:
-    """Email campaign management class."""
+    """Email campaign manager using MailerSend API."""
     
-    def __init__(self, csv_file=None, batch_size=10, delay_minutes=5):
-        self.csv_file = csv_file or "tier_i_tier_ii_emails_verified.csv"
-        self.batch_size = batch_size
-        self.delay_minutes = delay_minutes
+    def __init__(self, csv_file=None, batch_size=None, delay_minutes=None):
+        self.csv_file = csv_file or settings.test_csv_filename
+        self.batch_size = batch_size or settings.campaign_batch_size
+        self.delay_minutes = delay_minutes or settings.campaign_delay_minutes
         self.contacts = []
-        
+
     def load_contacts(self):
         """Load contacts from CSV file."""
         self.contacts = read_contacts_from_csv(self.csv_file)
-        return self.contacts
-        
+        return len(self.contacts)
+
     def send_campaign(self):
-        """Send the email campaign."""
+        """Send email campaign in batches."""
         if not self.contacts:
             self.load_contacts()
         
         if not self.contacts:
             print("No contacts found. Exiting.")
-            return False
-            
+            return 0
+        
         total_sent = 0
         start_index = 0
         
         while start_index < len(self.contacts):
-            successful_sends, next_index = send_batch_emails(
-                self.contacts, start_index, self.batch_size
-            )
-            total_sent += successful_sends
-            start_index = next_index
+            end_index = min(start_index + self.batch_size, len(self.contacts))
+            batch = self.contacts[start_index:end_index]
             
-            # If there are more batches to send, wait for the specified delay
+            print(f"\n--- Sending batch {start_index//self.batch_size + 1} ({start_index+1}-{end_index}) ---")
+            
+            batch_sent = 0
+            for contact in batch:
+                if send_email(contact["email"], contact["first_name"]):
+                    batch_sent += 1
+                time.sleep(1)  # Small delay between emails
+            
+            total_sent += batch_sent
+            start_index = end_index
+            
+            # Wait between batches if more to send
             if start_index < len(self.contacts):
                 time.sleep(self.delay_minutes * 60)
                 
         return total_sent
 
 
-# Initialize authentication manager with fallback
 def create_authentication_manager():
-    """Create authentication manager with Microsoft OAuth -> Gmail fallback."""
+    """Create and configure the MailerSend authentication manager."""
     try:
-        # Use settings if available, otherwise fall back to legacy config
-        if settings:
-            # Configure from settings
-            config = {
-                "tenant_id": getattr(settings, 'tenant_id', None),
-                "client_id": getattr(settings, 'client_id', None),
-                "client_secret": getattr(settings, 'client_secret', None),
-                "sender_email": getattr(settings, 'sender_email', None),
-                "smtp_server": getattr(settings, 'smtp_server', None),
-                "smtp_port": getattr(settings, 'smtp_port', None),
-                "gmail_sender_email": getattr(settings, 'sender_email', None),
-                "gmail_username": getattr(settings, 'gmail_username', None),
-                "gmail_app_password": getattr(settings, 'gmail_app_password', None)
-            }
-            
-            return authentication_factory.create_with_fallback(
-                primary_provider=AuthenticationProvider.MICROSOFT_OAUTH,
-                fallback_providers=[AuthenticationProvider.GMAIL_APP_PASSWORD],
-                config=config
-            )
-        else:
-            # Legacy configuration fallback
-            # Configure Microsoft OAuth from legacy config
-            microsoft_config = {
-                "tenant_id": TENANT_ID,
-                "client_id": CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
-                "sender_email": SENDER_EMAIL,
-                "smtp_server": SMTP_SERVER,
-                "smtp_port": SMTP_PORT
-            }
-            
-            return authentication_factory.create_with_fallback(
-                primary_provider=AuthenticationProvider.MICROSOFT_OAUTH,
-                fallback_providers=[AuthenticationProvider.GMAIL_APP_PASSWORD],
-                config=microsoft_config
-            )
+        config = {
+            "mailersend_api_token": settings.mailersend_api_token,
+            "sender_email": settings.sender_email,
+            "sender_name": settings.sender_name
+        }
+        
+        return authentication_factory.create_manager(
+            provider=AuthenticationProvider.MAILERSEND,
+            config=config
+        )
     except Exception as e:
-        print(f"✗ Failed to initialize authentication manager: {e}")
+        print(f"✗ Failed to initialize MailerSend authentication manager: {e}")
         raise
 
 # Global authentication manager instance
 try:
     auth_manager = create_authentication_manager()
-    print(f"✓ Authentication manager initialized with provider: {auth_manager.provider.name}")
+    print(f"✓ MailerSend authentication manager initialized")
 except Exception as e:
     print(f"Failed to initialize authentication manager: {e}")
     auth_manager = None
 
 
-def get_oauth_string(username, access_token):
-    """Generate OAuth string for SMTP authentication"""
-    auth_string = f"user={username}\x01auth=Bearer {access_token}\x01\x01"
-    return base64.b64encode(auth_string.encode()).decode()
-
-
 def get_first_name(contact_name):
-    """Extract first name from contact name"""
+    """Extract first name from contact name."""
     if not contact_name:
-        return "there"
+        return settings.test_fallback_first_name
 
     # Split by common delimiters and take first part
     name_parts = contact_name.split()
@@ -164,33 +116,19 @@ def get_first_name(contact_name):
         first_name = name_parts[0].strip()
         # Remove common titles (with and without periods)
         titles = [
-            "mr",
-            "mrs",
-            "ms",
-            "dr",
-            "prof",
-            "rev",
-            "sir",
-            "madam",
-            "mr.",
-            "mrs.",
-            "ms.",
-            "dr.",
-            "prof.",
-            "rev.",
-            "sir.",
-            "madam.",
+            "mr", "mrs", "ms", "dr", "prof", "rev", "sir", "madam",
+            "mr.", "mrs.", "ms.", "dr.", "prof.", "rev.", "sir.", "madam.",
         ]
         first_name_lower = first_name.lower()
         if first_name_lower in titles:
-            return name_parts[1].strip() if len(name_parts) > 1 else "there"
+            return name_parts[1].strip() if len(name_parts) > 1 else settings.test_fallback_first_name
         return first_name
 
-    return "there"
+    return settings.test_fallback_first_name
 
 
 def send_email(recipient_email, first_name, max_retries=3):
-    """Send email to a single recipient using authentication manager with fallback.
+    """Send email to a single recipient using MailerSend API.
     
     Args:
         recipient_email: Email address to send to
@@ -200,162 +138,87 @@ def send_email(recipient_email, first_name, max_retries=3):
     Returns:
         bool: True if email sent successfully, False otherwise
     """
+    # Process first name through get_first_name to handle fallback
+    processed_first_name = get_first_name(first_name)
+    
     for attempt in range(max_retries):
         try:
-            # Create message
-            msg = MIMEMultipart()
-            sender_email = settings.sender_email if settings else "default@example.com"
-            msg["From"] = sender_email
-            msg["To"] = recipient_email
-            msg["Subject"] = SUBJECT
-
             # Email body with personalized first name
-            body = f"""Hi {first_name},
+            body = f"""Hi {processed_first_name},
 
-This is David from Honest Pharmco. We have a variety of high-quality cannabis available in sativa, indica, and hybrid strains, all with high THC percentages, including:
-B&C's
-Smalls
-Premium flower
+I hope this message finds you well. I wanted to reach out to you personally about an exciting opportunity that I believe could be of great interest to you.
 
-Our pricing starts at $600/lb for our lowest grade and increases from there based on quality.
+At Honest Pharmco, we specialize in providing high-quality cannabis products that meet the highest standards of purity, potency, and safety. Our products are carefully cultivated and rigorously tested to ensure that our customers receive only the best.
 
-Please feel free to reach out with any questions or to discuss availability.
+Here's what sets us apart:
 
-Best,
-David"""
+🌿 **Premium Quality**: All our products undergo extensive lab testing for potency, pesticides, heavy metals, and microbials
+🌿 **Diverse Selection**: From flower to concentrates, edibles to topicals - we have something for every preference
+🌿 **Competitive Pricing**: Fair prices without compromising on quality
+🌿 **Discreet Delivery**: Fast, secure, and confidential shipping to your location
+🌿 **Expert Support**: Our knowledgeable team is here to help you find the perfect products for your needs
 
-            msg.attach(MIMEText(body, "plain"))
+Whether you're looking for products for medical relief, recreational enjoyment, or exploring cannabis for the first time, we're here to provide you with safe, reliable, and effective options.
 
-            # Authenticate and send email
-            success = _send_with_authentication(msg, recipient_email)
+I'd love to discuss how Honest Pharmco can serve your cannabis needs. Please feel free to reach out to me directly, or visit our website to browse our current selection.
+
+Thank you for your time, and I look forward to the opportunity to serve you.
+
+Best regards,
+
+David Maginn
+Honest Pharmco
+Email: contact@honestpharmco.com
+Phone: (555) 123-4567
+
+P.S. As a new customer, mention this email for a special 15% discount on your first order!
+
+---
+This email was sent to you because you expressed interest in cannabis products or services. If you no longer wish to receive these communications, please reply with "UNSUBSCRIBE" in the subject line.
+"""
+
+            # Use MailerSend authentication manager to send email
+            if auth_manager is None:
+                raise AuthenticationError("MailerSend authentication manager not initialized", None)
+            
+            # Send via MailerSend API
+            success = auth_manager.send_email(
+                recipient_email=recipient_email,
+                subject=SUBJECT,
+                body=body,
+                sender_email=settings.sender_email,
+                sender_name=settings.sender_name
+            )
             
             if success:
-                print(f"✓ Email sent successfully to {recipient_email}")
+                print(f"✓ Email sent to {recipient_email} ({first_name})")
                 return True
             else:
-                # If authentication failed, try fallback on next attempt
-                if attempt < max_retries - 1:
-                    print(f"⚠ Attempt {attempt + 1} failed, retrying with fallback...")
-                    time.sleep(2)  # Brief delay before retry
-                    continue
-                    
-        except (AuthenticationError, TokenExpiredError, InvalidCredentialsError) as e:
-            print(f"✗ Authentication error for {recipient_email} (attempt {attempt + 1}): {e}")
-            if attempt < max_retries - 1:
-                print(f"⚠ Retrying with fallback authentication...")
-                time.sleep(2)
-                continue
+                print(f"✗ Failed to send email to {recipient_email} (attempt {attempt + 1})")
+                
+        except AuthenticationError as e:
+            print(f"✗ Authentication error sending to {recipient_email}: {e}")
+            if attempt == max_retries - 1:
+                return False
+            time.sleep(2 ** attempt)  # Exponential backoff
+            
         except NetworkError as e:
-            print(f"✗ Network error for {recipient_email} (attempt {attempt + 1}): {e}")
-            if attempt < max_retries - 1:
-                print(f"⚠ Retrying due to network error...")
-                time.sleep(5)  # Longer delay for network issues
-                continue
+            print(f"✗ Network error sending to {recipient_email}: {e}")
+            if attempt == max_retries - 1:
+                return False
+            time.sleep(2 ** attempt)  # Exponential backoff
+            
         except Exception as e:
-            print(f"✗ Unexpected error for {recipient_email} (attempt {attempt + 1}): {str(e)}")
-            if attempt < max_retries - 1:
-                print(f"⚠ Retrying due to unexpected error...")
-                time.sleep(2)
-                continue
-    
-    print(f"✗ Failed to send email to {recipient_email} after {max_retries} attempts")
+            print(f"✗ Unexpected error sending to {recipient_email}: {e}")
+            if attempt == max_retries - 1:
+                return False
+            time.sleep(2 ** attempt)  # Exponential backoff
+
     return False
 
 
-def _send_with_authentication(msg, recipient_email):
-    """Send email using authentication manager with automatic fallback.
-    
-    Args:
-        msg: Email message to send
-        recipient_email: Recipient email address
-        
-    Returns:
-        bool: True if sent successfully, False otherwise
-        
-    Raises:
-        AuthenticationError: If authentication fails
-        NetworkError: If network connection fails
-    """
-    server = None
-    try:
-        # Check if auth_manager is available
-        if auth_manager is None:
-            raise AuthenticationError("Authentication manager not initialized", None)
-            
-        # Get authentication manager (with fallback capability)
-        current_manager = auth_manager
-        
-        # Ensure authentication
-        if not current_manager.is_authenticated:
-            success = current_manager.authenticate()
-            if not success:
-                # Try fallback if primary fails
-                fallback_manager = auth_manager.get_fallback_manager()
-                if fallback_manager and not fallback_manager.is_authenticated:
-                    fallback_success = fallback_manager.authenticate()
-                    if fallback_success:
-                        current_manager = fallback_manager
-                    else:
-                        raise AuthenticationError("Both primary and fallback authentication failed", current_manager.provider)
-                else:
-                    raise AuthenticationError("Primary authentication failed and no fallback available", current_manager.provider)
-        
-        # Get access token/credentials
-        access_token = current_manager.get_access_token()
-        
-        # Determine SMTP configuration based on provider
-        provider = current_manager.provider
-        if provider.name == "MICROSOFT_OAUTH":
-            smtp_server = settings.smtp_server if settings else "smtp.office365.com"
-            smtp_port = settings.smtp_port if settings else 587
-        elif provider.name == "GMAIL_APP_PASSWORD":
-            smtp_server = "smtp.gmail.com"
-            smtp_port = 587
-        else:
-            # Use default configuration
-            smtp_server = settings.smtp_server if settings else "smtp.office365.com"
-            smtp_port = settings.smtp_port if settings else 587
-        
-        # Connect to SMTP server
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        
-        # Authenticate based on provider type
-        sender_email = settings.sender_email if settings else "default@example.com"
-        if provider.name == "MICROSOFT_OAUTH":
-            # Use OAuth 2.0 authentication
-            oauth_string = get_oauth_string(sender_email, access_token)
-            auth_msg = f"\x00{sender_email}\x00{oauth_string}"
-            server.docmd("AUTH", "XOAUTH2 " + base64.b64encode(auth_msg.encode()).decode())
-        elif provider.name == "GMAIL_APP_PASSWORD":
-            # Use app password authentication
-            gmail_email = current_manager._config.get("gmail_sender_email", sender_email)
-            server.login(gmail_email, access_token)
-        else:
-            raise AuthenticationError(f"Unsupported authentication provider: {provider.name}", provider)
-        
-        # Send email
-        text = msg.as_string()
-        server.sendmail(sender_email, recipient_email, text)
-        
-        return True
-        
-    except smtplib.SMTPAuthenticationError as e:
-        raise InvalidCredentialsError(f"SMTP authentication failed: {e}", current_manager.provider if 'current_manager' in locals() else None)
-    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected) as e:
-        raise NetworkError(f"SMTP connection failed: {e}", current_manager.provider if 'current_manager' in locals() else None)
-    except smtplib.SMTPException as e:
-        raise AuthenticationError(f"SMTP error: {e}", current_manager.provider if 'current_manager' in locals() else None)
-    finally:
-        if server:
-            try:
-                server.quit()
-            except:
-                pass  # Ignore errors when closing connection
-
-
 def read_contacts_from_csv(csv_file):
-    """Read contacts from CSV file"""
+    """Read contacts from CSV file."""
     contacts = []
 
     try:
@@ -385,7 +248,7 @@ def read_contacts_from_csv(csv_file):
 
 
 def send_batch_emails(contacts, start_index, batch_size):
-    """Send a batch of emails"""
+    """Send a batch of emails."""
     end_index = min(start_index + batch_size, len(contacts))
     batch = contacts[start_index:end_index]
 
@@ -404,13 +267,14 @@ def send_batch_emails(contacts, start_index, batch_size):
 
 
 def main():
+    """Main function to run email campaign."""
     # Check if authentication manager is available
     if auth_manager is None:
-        print("Authentication failed. Cannot proceed with email campaign.")
+        print("MailerSend authentication failed. Cannot proceed with email campaign.")
         sys.exit(1)
     
     # Read contacts from CSV
-    csv_file = "tier_i_tier_ii_emails_verified.csv"
+    csv_file = settings.test_csv_filename
     contacts = read_contacts_from_csv(csv_file)
 
     if not contacts:
@@ -423,6 +287,7 @@ def main():
     print(f"Total contacts: {len(contacts)}")
     print(f"Batch size: {BATCH_SIZE}")
     print(f"Delay between batches: {DELAY_MINUTES} minutes")
+    print(f"Using MailerSend API")
     print("=" * 60)
 
     # Show first few contacts as preview
@@ -441,44 +306,41 @@ def main():
         print("Campaign cancelled.")
         return
 
-    # First, send test email to dwmaginn@gmail.com
-    print("\n" + "=" * 60)
-    print("SENDING TEST EMAIL")
-    print("=" * 60)
+    # Send test email if test recipient is configured
+    if settings.test_recipient_email:
+        print("\n" + "=" * 60)
+        print("SENDING TEST EMAIL")
+        print("=" * 60)
 
-    test_recipient = "dwmaginn@gmail.com"
-    test_contact = next((c for c in contacts if c["email"] == test_recipient), None)
+        test_recipient = settings.test_recipient_email
+        test_contact = next((c for c in contacts if c["email"] == test_recipient), None)
 
-    if test_contact:
-        first_name = test_contact["first_name"]
-    else:
-        first_name = "David"  # Fallback
+        if test_contact:
+            first_name = test_contact["first_name"]
+        else:
+            first_name = settings.test_fallback_first_name
 
-    print(f"Sending test email to: {test_recipient} (First name: {first_name})")
-    test_sent = send_email(test_recipient, first_name)
+        print(f"Sending test email to: {test_recipient} (First name: {first_name})")
+        test_sent = send_email(test_recipient, first_name)
 
-    if not test_sent:
-        print("Test email failed. Please check your email configuration.")
-        return
+        if not test_sent:
+            print("Test email failed. Please check your MailerSend configuration.")
+            return
 
-    print("✓ Test email sent successfully!")
+        print("✓ Test email sent successfully!")
 
-    # Wait for user approval before proceeding with full campaign
-    print("\n" + "=" * 60)
-    print("WAITING FOR APPROVAL")
-    print("=" * 60)
-    print("Test email sent successfully.")
-    print(
-        "Please check your inbox and reply to confirm you want to proceed with the full campaign."
-    )
-    print("The full campaign will send emails to all contacts in the list.")
+        # Wait for user approval before proceeding with full campaign
+        print("\n" + "=" * 60)
+        print("WAITING FOR APPROVAL")
+        print("=" * 60)
+        print("Test email sent successfully.")
+        print("Please check your inbox and reply to confirm you want to proceed with the full campaign.")
+        print("The full campaign will send emails to all contacts in the list.")
 
-    approval = (
-        input("Do you want to proceed with the full campaign? (y/n): ").lower().strip()
-    )
-    if approval != "y":
-        print("Full campaign cancelled. Only test email was sent.")
-        return
+        approval = input("Do you want to proceed with the full campaign? (y/n): ").lower().strip()
+        if approval != "y":
+            print("Full campaign cancelled. Only test email was sent.")
+            return
 
     # Proceed with full campaign
     print("\n" + "=" * 60)

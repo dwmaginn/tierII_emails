@@ -1,21 +1,14 @@
 # Email Campaign Dependencies
-# Core Python packages for email functionality and OAuth authentication
+# Core Python packages for MailerSend API email functionality
 
-# HTTP requests for OAuth token management
+# HTTP requests for API communication
 requests>=2.28.0
-
-# Email handling (built into Python standard library, but listed for clarity)
-# smtplib - included in Python standard library
-# email - included in Python standard library
 
 # CSV handling (built into Python standard library)
 # csv - included in Python standard library
 
 # Date and time handling (built into Python standard library)
 # datetime - included in Python standard library
-
-# Base64 encoding for OAuth (built into Python standard library)
-# base64 - included in Python standard library
 
 # JSON handling (built into Python standard library)
 # json - included in Python standard library
@@ -34,6 +27,9 @@ requests>=2.28.0
 # Configuration file handling and validation
 python-dotenv>=1.0.0  # Environment variable loading from .env files
 pydantic-settings>=2.0.0  # Settings management with validation
+
+# MailerSend API integration
+mailersend>=2.0.0  # Official MailerSend Python SDK for transactional emails
 
 # Development dependencies (uncomment for development)
 # pytest>=7.0.0  # For unit testing

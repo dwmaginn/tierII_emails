@@ -27,7 +27,7 @@ class ConcreteAuthenticationManager(BaseAuthenticationManager):
     """Concrete implementation for testing BaseAuthenticationManager."""
 
     def __init__(
-        self, provider: AuthenticationProvider = AuthenticationProvider.MICROSOFT_OAUTH
+        self, provider: AuthenticationProvider = AuthenticationProvider.MAILERSEND
     ):
         super().__init__(provider)
         self._mock_token = "mock_access_token"
@@ -55,9 +55,6 @@ class ConcreteAuthenticationManager(BaseAuthenticationManager):
             raise TokenExpiredError("Token refresh failed", self.provider)
         return True
 
-    def get_smtp_auth_string(self, username: str) -> str:
-        return f"mock_auth_string_{username}_{self._mock_token}"
-
     def validate_configuration(self) -> bool:
         return "required_key" in self._config
 
@@ -67,13 +64,12 @@ class TestAuthenticationProvider:
 
     def test_provider_values(self):
         """Test that provider enum has expected values."""
-        assert AuthenticationProvider.MICROSOFT_OAUTH.value == "microsoft_oauth"
-        assert AuthenticationProvider.GMAIL_APP_PASSWORD.value == "gmail_app_password"
+        assert AuthenticationProvider.MAILERSEND.value == "mailersend"
 
     def test_provider_count(self):
         """Test that we have the expected number of providers."""
         providers = list(AuthenticationProvider)
-        assert len(providers) == 2
+        assert len(providers) == 1
 
 
 class TestAuthenticationExceptions:
@@ -81,7 +77,7 @@ class TestAuthenticationExceptions:
 
     def test_authentication_error(self):
         """Test AuthenticationError exception."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
+        provider = AuthenticationProvider.MAILERSEND
         error = AuthenticationError("Test error", provider)
 
         assert str(error) == "Test error"
@@ -90,7 +86,7 @@ class TestAuthenticationExceptions:
 
     def test_token_expired_error(self):
         """Test TokenExpiredError exception."""
-        provider = AuthenticationProvider.GMAIL_APP_PASSWORD
+        provider = AuthenticationProvider.MAILERSEND
         error = TokenExpiredError("Token expired", provider)
 
         assert str(error) == "Token expired"
@@ -99,7 +95,7 @@ class TestAuthenticationExceptions:
 
     def test_invalid_credentials_error(self):
         """Test InvalidCredentialsError exception."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
+        provider = AuthenticationProvider.MAILERSEND
         error = InvalidCredentialsError("Invalid creds", provider)
 
         assert str(error) == "Invalid creds"
@@ -108,7 +104,7 @@ class TestAuthenticationExceptions:
 
     def test_network_error(self):
         """Test NetworkError exception."""
-        provider = AuthenticationProvider.GMAIL_APP_PASSWORD
+        provider = AuthenticationProvider.MAILERSEND
         error = NetworkError("Network failed", provider)
 
         assert str(error) == "Network failed"
@@ -122,11 +118,11 @@ class TestBaseAuthenticationManager:
     def test_cannot_instantiate_abstract_class(self):
         """Test that BaseAuthenticationManager cannot be instantiated directly."""
         with pytest.raises(TypeError):
-            BaseAuthenticationManager(AuthenticationProvider.MICROSOFT_OAUTH)
+            BaseAuthenticationManager(AuthenticationProvider.MAILERSEND)
 
     def test_concrete_implementation_initialization(self):
         """Test that concrete implementation initializes properly."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
+        provider = AuthenticationProvider.MAILERSEND
         manager = ConcreteAuthenticationManager(provider)
 
         assert manager.provider == provider
@@ -137,9 +133,9 @@ class TestBaseAuthenticationManager:
     def test_get_provider_name(self):
         """Test get_provider_name method."""
         manager = ConcreteAuthenticationManager(
-            AuthenticationProvider.GMAIL_APP_PASSWORD
+            AuthenticationProvider.MAILERSEND
         )
-        assert manager.get_provider_name() == "Gmail App Password"
+        assert manager.get_provider_name() == "Mailersend"
 
     def test_get_authentication_status(self):
         """Test get_authentication_status method."""
@@ -215,10 +211,6 @@ class TestBaseAuthenticationManager:
         # Test refresh_token
         assert manager.refresh_token() is True
 
-        # Test get_smtp_auth_string
-        auth_string = manager.get_smtp_auth_string("test@example.com")
-        assert "mock_auth_string_test@example.com_mock_access_token" == auth_string
-
         # Test validate_configuration - initially should be False
         assert manager.validate_configuration() is False  # No required_key set
 
@@ -239,7 +231,7 @@ class TestBaseAuthenticationManager:
             manager.authenticate()
 
         assert "Mock authentication failed" in str(exc_info.value)
-        assert exc_info.value.provider == AuthenticationProvider.MICROSOFT_OAUTH
+        assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
 
     def test_token_error_handling(self):
         """Test that token-related errors are properly handled."""
@@ -267,18 +259,17 @@ class TestBaseAuthenticationManager:
         token2 = manager.get_access_token()
         assert token2 == "mock_access_token"
 
-    def test_smtp_auth_string_with_custom_token(self):
-        """Test SMTP auth string generation."""
+    def test_access_token_consistency(self):
+        """Test access token consistency."""
         manager = ConcreteAuthenticationManager()
 
-        # Test with default token
-        auth_string1 = manager.get_smtp_auth_string("test@example.com")
-        assert "mock_access_token" in auth_string1
+        # Test get_access_token
+        token1 = manager.get_access_token()
+        assert token1 == "mock_access_token"
 
-        # Test with different username
-        auth_string2 = manager.get_smtp_auth_string("other@example.com")
-        assert "mock_access_token" in auth_string2
-        assert "other@example.com" in auth_string2
+        # Test again to ensure consistency
+        token2 = manager.get_access_token()
+        assert token2 == "mock_access_token"
 
     def test_is_token_valid_with_custom_token(self):
         """Test token validation."""
@@ -313,11 +304,6 @@ class TestBaseAuthenticationManagerIntegration:
 
         # Validate token
         assert manager.is_token_valid() is True
-
-        # Get SMTP auth string
-        auth_string = manager.get_smtp_auth_string(config["username"])
-        assert "test@example.com" in auth_string
-        assert "mock_access_token" in auth_string
 
         # Check authentication status
         status = manager.get_authentication_status()

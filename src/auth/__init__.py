@@ -1,8 +1,7 @@
 """Authentication module for email campaign system.
 
-This module provides a unified authentication interface supporting multiple
-providers including Microsoft OAuth and Gmail App Passwords. It implements
-the factory pattern for provider selection and consistent error handling.
+This module provides a unified authentication interface for MailerSend API.
+It implements the factory pattern for provider selection and consistent error handling.
 
 Usage:
     from auth import authentication_factory, AuthenticationProvider
@@ -12,14 +11,13 @@ Usage:
     
     # Specify provider
     manager = authentication_factory.create_manager(
-        provider=AuthenticationProvider.MICROSOFT_OAUTH,
+        provider=AuthenticationProvider.MAILERSEND,
         config=config
     )
     
-    # Authenticate and get token
+    # Authenticate and get API key
     if manager.authenticate(credentials):
-        token = manager.get_access_token()
-        auth_string = manager.get_smtp_auth_string(username, token)
+        api_key = manager.get_access_token()
 """
 
 from .base_authentication_manager import (
@@ -31,17 +29,11 @@ from .base_authentication_manager import (
     NetworkError,
 )
 from .authentication_factory import AuthenticationFactory, authentication_factory
-from .oauth_token_manager import OAuthTokenManager
-from .microsoft_oauth_manager import MicrosoftOAuthManager
-from .gmail_app_password_manager import GmailAppPasswordManager
+from .mailersend_manager import MailerSendManager
 
 # Register providers with the global factory
 authentication_factory.register_provider(
-    AuthenticationProvider.MICROSOFT_OAUTH, MicrosoftOAuthManager
-)
-
-authentication_factory.register_provider(
-    AuthenticationProvider.GMAIL_APP_PASSWORD, GmailAppPasswordManager
+    AuthenticationProvider.MAILERSEND, MailerSendManager
 )
 
 __all__ = [
@@ -57,9 +49,7 @@ __all__ = [
     "AuthenticationFactory",
     "authentication_factory",
     # Provider implementations
-    "OAuthTokenManager",
-    "MicrosoftOAuthManager",
-    "GmailAppPasswordManager",
+    "MailerSendManager",
 ]
 
 # Version information
