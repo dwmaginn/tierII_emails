@@ -45,11 +45,10 @@ class MicrosoftOAuthManager(BaseAuthenticationManager):
         self._current_token: Optional[str] = None
         self._token_expiry: Optional[datetime] = None
 
-    def authenticate(self, credentials: Dict[str, Any]) -> bool:
+    def authenticate(self) -> bool:
         """Authenticate using Microsoft OAuth credentials.
 
-        Args:
-            credentials: Dictionary containing OAuth credentials
+        Uses the configuration set during initialization via set_configuration().
 
         Returns:
             True if authentication successful, False otherwise
@@ -60,9 +59,8 @@ class MicrosoftOAuthManager(BaseAuthenticationManager):
             AuthenticationError: If authentication fails for other reasons
         """
         try:
-            # Merge credentials with existing configuration
-            config = {**self._config, **credentials}
-            self.set_configuration(config)
+            # Use configuration set during initialization
+            config = self._config
 
             if not self.validate_configuration():
                 raise InvalidCredentialsError(

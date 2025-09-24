@@ -59,7 +59,7 @@ try:
         
         # Test authentication
         print(f"\nTesting authentication...")
-        auth_result = manager.authenticate(config)
+        auth_result = manager.authenticate()
         print(f"Authentication result: {auth_result}")
         
 except Exception as e:

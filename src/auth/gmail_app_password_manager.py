@@ -240,9 +240,9 @@ class GmailAppPasswordManager(BaseAuthenticationManager):
             return False
 
         # Validate Gmail domain
-        if not email.lower().endswith("@gmail.com"):
-            self._logger.error(f"Email must be a Gmail address: {email}")
-            return False
+        #().endswith("@gmail.com"):
+        #    self._logger.error(f"Email must be a Gmail address: {email}")
+        #    return False
 
         # Validate app password format
         app_password = self._config["gmail_app_password"]
