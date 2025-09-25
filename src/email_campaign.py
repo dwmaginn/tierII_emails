@@ -252,10 +252,24 @@ def send_email(recipient_email, first_name, max_retries=3):
                 print(f"✗ Failed to send email to {recipient_email} (attempt {attempt + 1})")
                 
         except AuthenticationError as e:
+            error_msg = str(e)
             print(f"✗ Authentication error sending to {recipient_email}: {e}")
-            if attempt == max_retries - 1:
-                return False
-            time.sleep(2 ** attempt)  # Exponential backoff
+            
+            # Check if it's a rate limit error (429)
+            if "429" in error_msg or "too many" in error_msg.lower():
+                if attempt == max_retries - 1:
+                    return False
+                
+                # For rate limit errors, wait longer - respect MailerSend's rate limits
+                # MailerSend allows 120 requests/min for healthy accounts, 10/min for under review
+                # Use conservative 6 requests per minute (10 second intervals)
+                retry_delay = 10 + (attempt * 5)  # 10, 15, 20 seconds
+                print(f"   Rate limit hit, waiting {retry_delay} seconds before retry...")
+                time.sleep(retry_delay)
+            else:
+                if attempt == max_retries - 1:
+                    return False
+                time.sleep(2 ** attempt)  # Exponential backoff for other auth errors
             
         except NetworkError as e:
             print(f"✗ Network error sending to {recipient_email}: {e}")
@@ -303,7 +317,7 @@ def read_contacts_from_csv(csv_file):
 
 
 def send_batch_emails(contacts, start_index, batch_size):
-    """Send a batch of emails."""
+    """Send a batch of emails with proper rate limiting."""
     end_index = min(start_index + batch_size, len(contacts))
     batch = contacts[start_index:end_index]
 
@@ -313,10 +327,15 @@ def send_batch_emails(contacts, start_index, batch_size):
 
     successful_sends = 0
 
-    for contact in batch:
+    for i, contact in enumerate(batch):
         if send_email(contact["email"], contact["first_name"]):
             successful_sends += 1
-        time.sleep(1)  # Small delay between emails in a batch
+        
+        # Rate limiting: MailerSend allows 120 requests/min for healthy accounts
+        # Use conservative 6 requests per minute (10 second intervals) to avoid rate limits
+        if i < len(batch) - 1:  # Don't wait after the last email in batch
+            print(f"   Waiting 10 seconds before next email (rate limiting)...")
+            time.sleep(10)
 
     return successful_sends, end_index
 

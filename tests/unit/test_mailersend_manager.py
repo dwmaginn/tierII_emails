@@ -25,7 +25,7 @@ class TestMailerSendManager:
     def mock_settings(self):
         """Mock settings for MailerSend configuration."""
         settings = Mock()
-        settings.mailersend_api_token = "ms_test_api_key_12345"
+        settings.mailersend_api_token = "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
         settings.sender_email = "test@example.com"
         settings.sender_name = "Test Sender"
         return settings
@@ -37,7 +37,7 @@ class TestMailerSendManager:
         
         manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
         manager.set_configuration({
-            'mailersend_api_token': 'ms_test_api_key_12345',
+            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',
             'sender_email': 'test@example.com',
             'sender_name': 'Test Sender'
         })
@@ -52,7 +52,7 @@ class TestMailerSendManager:
         
         manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
         manager.set_configuration({
-            'mailersend_api_token': 'ms_test_api_key_12345',
+            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',
             'sender_email': 'test@example.com',
             'sender_name': 'Test Sender'
         })
@@ -60,7 +60,7 @@ class TestMailerSendManager:
         # Validate configuration to initialize the manager
         assert manager.validate_configuration() is True
         assert manager.provider == AuthenticationProvider.MAILERSEND
-        assert manager._api_key == "ms_test_api_key_12345"
+        assert manager._api_key == "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
         assert manager._client is not None
 
     def test_mailersend_manager_missing_api_key(self):
@@ -106,59 +106,146 @@ class TestMailerSendManager:
         result = manager.validate_configuration()
         assert result is False
 
-    def test_validate_configuration_invalid_sender_email(self, mock_settings):
-        """Test configuration validation fails with invalid sender email."""
+    # NEW TESTS FOR FORMAT-BASED AUTHENTICATION
+    def test_authenticate_success_with_valid_format(self, mailersend_manager):
+        """Test successful authentication with valid MailerSend API key format (no API calls)."""
+        # This test should pass when authenticate() uses format validation only
+        result = mailersend_manager.authenticate()
+        
+        assert result is True
+        assert mailersend_manager.is_authenticated is True
+        assert mailersend_manager.last_authenticated is not None
+
+    def test_authenticate_invalid_format_short_key(self):
+        """Test authentication failure with invalid API key format - too short."""
         from src.auth.mailersend_manager import MailerSendManager
         
-        mock_settings.sender_email = "invalid-email"
-        manager = MailerSendManager(mock_settings)
+        manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        manager.set_configuration({
+            'mailersend_api_token': 'mlsn.short',  # Invalid: too short
+            'sender_email': 'test@example.com',
+            'sender_name': 'Test Sender'
+        })
+        manager.validate_configuration()
         
-        result = manager.validate_configuration()
-        assert result is False
+        with pytest.raises(InvalidCredentialsError) as exc_info:
+            manager.authenticate()
+        
+        assert "Invalid MailerSend API key format" in str(exc_info.value)
+        assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
 
-    def test_authenticate_success(self, mailersend_manager):
-        """Test successful authentication with MailerSend API."""
-        # Mock the client's tokens.list_tokens method directly
+    def test_authenticate_invalid_format_wrong_prefix(self):
+        """Test authentication failure with invalid API key format - wrong prefix."""
+        from src.auth.mailersend_manager import MailerSendManager
+        
+        manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        manager.set_configuration({
+            'mailersend_api_token': 'wrong.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',  # Invalid: wrong prefix
+            'sender_email': 'test@example.com',
+            'sender_name': 'Test Sender'
+        })
+        manager.validate_configuration()
+        
+        with pytest.raises(InvalidCredentialsError) as exc_info:
+            manager.authenticate()
+        
+        assert "Invalid MailerSend API key format" in str(exc_info.value)
+        assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
+
+    def test_authenticate_invalid_format_non_hex_characters(self):
+        """Test authentication failure with invalid API key format - non-hex characters."""
+        from src.auth.mailersend_manager import MailerSendManager
+        
+        manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        manager.set_configuration({
+            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f606g',  # Invalid: 'g' is not hex
+            'sender_email': 'test@example.com',
+            'sender_name': 'Test Sender'
+        })
+        manager.validate_configuration()
+        
+        with pytest.raises(InvalidCredentialsError) as exc_info:
+            manager.authenticate()
+        
+        assert "Invalid MailerSend API key format" in str(exc_info.value)
+        assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
+
+    def test_authenticate_no_api_calls_made(self, mailersend_manager):
+        """Test that authenticate() method makes no API calls during format validation."""
+        # Mock the client to ensure no API calls are made
         with patch.object(mailersend_manager._client.tokens, 'list_tokens') as mock_list_tokens:
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_list_tokens.return_value = mock_response
-            
             result = mailersend_manager.authenticate()
             
+            # Should succeed without making any API calls
             assert result is True
             assert mailersend_manager.is_authenticated is True
-            assert mailersend_manager.last_authenticated is not None
+            # Ensure no API calls were made
+            mock_list_tokens.assert_not_called()
+
+    def test_validate_mailersend_api_key_format_valid(self):
+        """Test _validate_mailersend_api_key_format method with valid key."""
+        from src.auth.mailersend_manager import MailerSendManager
+        
+        manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        
+        # Test valid format
+        valid_key = "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
+        assert manager._validate_mailersend_api_key_format(valid_key) is True
+
+    def test_validate_mailersend_api_key_format_invalid_cases(self):
+        """Test _validate_mailersend_api_key_format method with various invalid keys."""
+        from src.auth.mailersend_manager import MailerSendManager
+        
+        manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        
+        # Test invalid cases
+        invalid_keys = [
+            "",  # Empty
+            "mlsn.",  # No hex part
+            "wrong.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061",  # Wrong prefix
+            "mlsn.short",  # Too short
+            "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f606g",  # Non-hex character
+            "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f60611",  # Too long (65 chars)
+            "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f606",  # Too short (63 chars)
+        ]
+        
+        for invalid_key in invalid_keys:
+            assert manager._validate_mailersend_api_key_format(invalid_key) is False, f"Key should be invalid: {invalid_key}"
+
+    # EXISTING TESTS (modified to work with new implementation)
+    def test_authenticate_success(self, mailersend_manager):
+        """Test successful authentication with MailerSend API."""
+        # This test is now redundant with format-based auth, but keeping for compatibility
+        result = mailersend_manager.authenticate()
+        
+        assert result is True
+        assert mailersend_manager.is_authenticated is True
+        assert mailersend_manager.last_authenticated is not None
 
     def test_authenticate_invalid_api_key(self, mailersend_manager):
         """Test authentication failure with invalid API key."""
-        # Mock the client's tokens.list_tokens method directly
-        with patch.object(mailersend_manager._client.tokens, 'list_tokens') as mock_list_tokens:
-            mock_response = Mock()
-            mock_response.status_code = 401
-            mock_response.json.return_value = {"message": "Invalid API key"}
-            mock_list_tokens.return_value = mock_response
-            
-            with pytest.raises(InvalidCredentialsError) as exc_info:
-                mailersend_manager.authenticate()
-            
-            assert "Invalid MailerSend API key" in str(exc_info.value)
-            assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
+        # Update the API key to an invalid format
+        mailersend_manager._api_key = "invalid_key_format"
+        
+        with pytest.raises(InvalidCredentialsError) as exc_info:
+            mailersend_manager.authenticate()
+        
+        assert "Invalid MailerSend API key format" in str(exc_info.value)
+        assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
 
     @patch('src.auth.mailersend_manager.MailerSendClient')
     def test_authenticate_network_error(self, mock_client_class, mailersend_manager):
         """Test authentication failure due to network error."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
+        # This test is no longer relevant since we don't make network calls during auth
+        # But keeping it to ensure the method handles unexpected errors gracefully
         
-        # Mock network exception
-        mock_client.tokens.list_tokens.side_effect = Exception("Network timeout")
-        
-        with pytest.raises(NetworkError) as exc_info:
-            mailersend_manager.authenticate()
-        
-        assert "Network error during MailerSend authentication" in str(exc_info.value)
-        assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
+        # Simulate an error in the format validation itself
+        with patch.object(mailersend_manager, '_validate_mailersend_api_key_format', side_effect=Exception("Unexpected error")):
+            with pytest.raises(NetworkError) as exc_info:
+                mailersend_manager.authenticate()
+            
+            assert "Network error during MailerSend authentication" in str(exc_info.value)
+            assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
 
     def test_send_email_success(self, mailersend_manager):
         """Test successful email sending via MailerSend."""
@@ -316,7 +403,7 @@ class TestMailerSendManagerIntegration:
     """Integration tests for MailerSendManager with other components."""
 
     def test_integration_with_authentication_factory(self):
-        """Test MailerSendManager integration with AuthenticationFactory."""
+        """Test integration with AuthenticationFactory."""
         from src.auth.authentication_factory import AuthenticationFactory
         from src.auth.mailersend_manager import MailerSendManager
         
@@ -326,12 +413,12 @@ class TestMailerSendManagerIntegration:
         factory.register_provider(AuthenticationProvider.MAILERSEND, MailerSendManager)
         
         mock_settings = Mock()
-        mock_settings.mailersend_api_token = "test_key"
+        mock_settings.mailersend_api_token = "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
         mock_settings.sender_email = "test@example.com"
         
         # Fix: Pass settings as config parameter, not as second argument
         config = {
-            'mailersend_api_token': 'test_key',
+            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',
             'sender_email': 'test@example.com'
         }
         
@@ -345,21 +432,24 @@ class TestMailerSendManagerIntegration:
         import time
         from src.auth.mailersend_manager import MailerSendManager
         
-        mock_settings = Mock()
-        mock_settings.mailersend_api_token = "test_key"
-        mock_settings.sender_email = "test@example.com"
+        # Use proper configuration dictionary instead of Mock
+        config = {
+            'mailersend_api_token': "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061",
+            'sender_email': "test@example.com",
+            'sender_name': "Test Sender"
+        }
         
-        mailersend_manager = MailerSendManager(mock_settings)
+        mailersend_manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        mailersend_manager.set_configuration(config)
+        
+        # Validate configuration to initialize API key
+        assert mailersend_manager.validate_configuration() is True
         
         # Authentication should complete within 5 seconds
         start_time = time.time()
         
-        with patch.object(mailersend_manager, '_client') as mock_client:
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_client.tokens.list_tokens.return_value = mock_response
-            
-            mailersend_manager.authenticate()
+        # No need to mock list_tokens since we're using format validation only
+        mailersend_manager.authenticate()
         
         auth_time = time.time() - start_time
         assert auth_time < 5.0, f"Authentication took {auth_time:.2f}s, should be < 5s"

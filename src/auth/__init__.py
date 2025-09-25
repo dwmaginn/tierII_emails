@@ -53,6 +53,6 @@ __all__ = [
 ]
 
 # Version information
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 __author__ = "Email Campaign System"
 __description__ = "Unified authentication interface for email providers"

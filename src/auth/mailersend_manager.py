@@ -7,6 +7,7 @@ with other authentication providers.
 
 import re
 import logging
+import urllib3
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -55,7 +56,22 @@ class MailerSendManager(BaseAuthenticationManager):
         """Initialize the MailerSend client."""
         try:
             self._client = MailerSendClient(api_key=self._api_key)
-            self._logger.debug("MailerSend client initialized successfully")
+            
+            # Disable urllib3 automatic retries to prevent interference with our retry logic
+            if hasattr(self._client, 'session') and self._client.session:
+                session = self._client.session
+                for adapter in session.adapters.values():
+                    if hasattr(adapter, 'max_retries'):
+                        # Disable all automatic retries
+                        adapter.max_retries = urllib3.util.Retry(
+                            total=0,
+                            read=False,
+                            connect=False,
+                            backoff_factor=0
+                        )
+                        adapter.max_retries.respect_retry_after_header = False
+            
+            self._logger.debug("MailerSend client initialized successfully with disabled urllib3 retries")
         except Exception as e:
             self._logger.error(f"Failed to initialize MailerSend client: {e}")
             raise InvalidCredentialsError(
@@ -105,6 +121,24 @@ class MailerSendManager(BaseAuthenticationManager):
         """
         return self.is_token_valid()
 
+    def _validate_mailersend_api_key_format(self, api_key: str) -> bool:
+        """Validate MailerSend API key format without making API calls.
+        
+        MailerSend API keys follow the pattern: mlsn. followed by 64 hexadecimal characters
+        
+        Args:
+            api_key: The API key to validate
+            
+        Returns:
+            bool: True if format is valid, False otherwise
+        """
+        if not api_key or not isinstance(api_key, str):
+            return False
+        
+        # MailerSend API key pattern: mlsn. + 64 hex characters
+        pattern = r'^mlsn\.[a-f0-9]{64}$'
+        return bool(re.match(pattern, api_key))
+
 
 
     def validate_configuration(self) -> bool:
@@ -123,6 +157,11 @@ class MailerSendManager(BaseAuthenticationManager):
                 self._logger.error("MailerSend API token is required")
                 return False
             
+            # Validate API key format
+            if not self._validate_mailersend_api_key_format(api_token.strip()):
+                self._logger.error("Invalid MailerSend API key format. Expected format: mlsn. followed by 64 hexadecimal characters")
+                return False
+            
             # Check required sender email
             sender_email = config.get('sender_email')
             if not sender_email or not sender_email.strip():
@@ -134,9 +173,8 @@ class MailerSendManager(BaseAuthenticationManager):
                 self._logger.error(f"Invalid sender email format: {sender_email}")
                 return False
             
-            # Initialize API key and client if validation passes
+            # Store API key for later initialization
             self._api_key = api_token.strip()
-            self._initialize_client()
             
             # Create settings object for backward compatibility
             from types import SimpleNamespace
@@ -164,41 +202,35 @@ class MailerSendManager(BaseAuthenticationManager):
         return re.match(pattern, email) is not None
 
     def authenticate(self) -> bool:
-        """Authenticate with MailerSend API.
+        """Authenticate with MailerSend API using format validation only.
+        
+        This method validates the API key format without making API calls
+        to prevent rate limiting issues. Actual API validation is deferred
+        to the first email send attempt.
         
         Returns:
             bool: True if authentication successful
             
         Raises:
-            InvalidCredentialsError: If API key is invalid
-            NetworkError: If network error occurs during authentication
+            InvalidCredentialsError: If API key format is invalid
+            NetworkError: If unexpected error occurs during validation
         """
         try:
-            self._logger.debug("Authenticating with MailerSend API")
+            self._logger.debug("Authenticating with MailerSend API (format validation only)")
             
-            # Test authentication by making a simple API call
-            # Use a minimal request to check API key validity
-            from mailersend.models import TokensListRequest
-            request = TokensListRequest()
-            response = self._client.tokens.list_tokens(request)
-            
-            if response.status_code == 200:
-                self.is_authenticated = True
-                self.last_authenticated = datetime.now()
-                self._logger.info("MailerSend authentication successful")
-                return True
-            elif response.status_code == 401:
+            # Validate API key format without making API calls
+            if not self._validate_mailersend_api_key_format(self._api_key):
                 raise InvalidCredentialsError(
-                    "Invalid MailerSend API key",
+                    "Invalid MailerSend API key format. Expected format: mlsn. followed by 64 hexadecimal characters",
                     AuthenticationProvider.MAILERSEND,
-                    "INVALID_API_KEY"
+                    "INVALID_API_KEY_FORMAT"
                 )
-            else:
-                raise AuthenticationError(
-                    f"MailerSend authentication failed with status {response.status_code}",
-                    AuthenticationProvider.MAILERSEND,
-                    f"HTTP_{response.status_code}"
-                )
+            
+            # Set authentication status based on format validation
+            self.is_authenticated = True
+            self.last_authenticated = datetime.now()
+            self._logger.info("MailerSend authentication successful (format validated)")
+            return True
                 
         except InvalidCredentialsError:
             raise
@@ -288,6 +320,10 @@ class MailerSendManager(BaseAuthenticationManager):
             AuthenticationError: If sending fails due to API errors
         """
         try:
+            # Initialize client if not already done
+            if self._client is None:
+                self._initialize_client()
+            
             # Build email using MailerSend EmailBuilder
             email = (EmailBuilder()
                     .from_email(
@@ -306,6 +342,20 @@ class MailerSendManager(BaseAuthenticationManager):
             if response.status_code == 202:  # MailerSend returns 202 for accepted
                 self._logger.info(f"Email sent successfully to {to_email}")
                 return True
+            elif response.status_code == 429:  # Rate limit exceeded
+                error_msg = f"Rate limit exceeded (429): Too many requests"
+                try:
+                    error_data = response.json()
+                    if 'message' in error_data:
+                        error_msg += f" - {error_data['message']}"
+                except:
+                    pass
+                
+                raise AuthenticationError(
+                    error_msg,
+                    AuthenticationProvider.MAILERSEND,
+                    f"RATE_LIMIT_429"
+                )
             else:
                 error_msg = f"Failed to send email: HTTP {response.status_code}"
                 try:

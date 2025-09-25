@@ -36,7 +36,7 @@ dev = [
 ]
 
 [project.scripts]
-tierII-email-campaign = "email_campaign:main"
+tierII-email-campaign = "src.email_campaign:main"
 
 [tool.setuptools.package-dir]
 "" = "src"
