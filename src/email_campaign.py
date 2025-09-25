@@ -2,6 +2,7 @@ import csv
 import time
 import sys
 import os
+import argparse
 from datetime import datetime
 from typing import Optional
 import logging
@@ -293,13 +294,51 @@ def send_batch_emails(contacts, start_index, batch_size):
 
 def main():
     """Main function to run email campaign."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Email Campaign Manager')
+    parser.add_argument('--test-csv', 
+                       help='Path to test CSV file (e.g., /c:/Users/73spi/Work/tierII_emails/data/test/testdata.csv)',
+                       type=str)
+    parser.add_argument('--test-auth', 
+                       help='Test authentication without sending emails',
+                       action='store_true')
+    parser.add_argument('--dry-run', 
+                       help='Run in dry-run mode (only send test email, skip full campaign)',
+                       action='store_true')
+    args = parser.parse_args()
+    
     # Check if authentication manager is available
     if auth_manager is None:
         print("MailerSend authentication failed. Cannot proceed with email campaign.")
         sys.exit(1)
     
+    # Handle authentication testing
+    if args.test_auth:
+        print("Testing MailerSend authentication...")
+        try:
+            auth_manager.authenticate()
+            print("✓ Authentication successful! MailerSend API key is valid.")
+            print(f"✓ Sender email configured: {settings.sender_email}")
+            sys.exit(0)
+        except AuthenticationError as e:
+            print(f"✗ Authentication failed: {e}")
+            sys.exit(1)
+        except NetworkError as e:
+            print(f"✗ Network error during authentication: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"✗ Unexpected error during authentication: {e}")
+            sys.exit(1)
+    
+    # Determine which CSV file to use
+    if args.test_csv:
+        csv_file = args.test_csv
+        print(f"Using test CSV file: {csv_file}")
+    else:
+        csv_file = settings.test_csv_filename
+        print(f"Using default CSV file: {csv_file}")
+    
     # Read contacts from CSV
-    csv_file = settings.test_csv_filename
     contacts = read_contacts_from_csv(csv_file)
 
     if not contacts:
@@ -325,10 +364,28 @@ def main():
     if len(contacts) > 5:
         print("...")
 
-    # Check if we should proceed
-    proceed = input("\nProceed with sending? (y/n): ").lower().strip()
-    if proceed != "y":
-        print("Campaign cancelled.")
+    # Check if we should proceed (skip in dry-run mode)
+    if not args.dry_run:
+        proceed = input("\nProceed with sending? (y/n): ").lower().strip()
+        if proceed != "y":
+            print("Campaign cancelled.")
+            return
+    else:
+        print("\nDry-run mode: Skipping user confirmation, proceeding to test email only.")
+
+    # Authenticate with MailerSend before sending emails
+    print("\nAuthenticating with MailerSend...")
+    try:
+        auth_manager.authenticate()
+        print("✓ Authentication successful!")
+    except AuthenticationError as e:
+        print(f"✗ Authentication failed: {e}")
+        return
+    except NetworkError as e:
+        print(f"✗ Network error during authentication: {e}")
+        return
+    except Exception as e:
+        print(f"✗ Unexpected error during authentication: {e}")
         return
 
     # Send test email if test recipient is configured
@@ -353,6 +410,15 @@ def main():
             return
 
         print("✓ Test email sent successfully!")
+
+        # In dry-run mode, stop after test email
+        if args.dry_run:
+            print("\n" + "=" * 60)
+            print("DRY-RUN MODE COMPLETED")
+            print("=" * 60)
+            print("Dry-run mode: Only test email was sent.")
+            print("To run the full campaign, use the command without --dry-run flag.")
+            return
 
         # Wait for user approval before proceeding with full campaign
         print("\n" + "=" * 60)

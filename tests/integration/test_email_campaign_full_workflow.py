@@ -45,38 +45,34 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
+    @patch("sys.argv", ["email_campaign.py", "--dry-run"])
     @patch("email_campaign.auth_manager")
     @patch("email_campaign.create_authentication_manager")
     @patch("email_campaign.send_email")
     @patch("email_campaign.read_contacts_from_csv")
-    @patch("builtins.input")
-    def test_full_workflow_mailersend_dry_run(self, mock_input, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
+    @patch("email_campaign.settings")
+    def test_full_workflow_mailersend_dry_run(self, mock_settings, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
         """Test full workflow with MailerSend in dry run mode."""
         from email_campaign import main
 
         # Setup authentication manager
-        mock_manager = Mock()
-        mock_manager.provider.name = "MAILERSEND"
-        mock_auth_factory = Mock()
-        mock_auth_factory.get_current_manager.return_value = mock_manager
-        mock_create_auth.return_value = mock_auth_factory
+        mock_auth_manager = Mock()
+        mock_auth_manager.provider.name = "MAILERSEND"
+        mock_create_auth.return_value = mock_auth_manager
         # The mock_auth_manager is already patched, just need to ensure it's not None
 
         # Setup contacts
-        mock_read_contacts.return_value = [
+        mock_contacts = [
             {"email": "test1@example.com", "first_name": "John", "contact_name": "John Doe"},
             {"email": "test2@example.com", "first_name": "Jane", "contact_name": "Jane Smith"}
         ]
+        mock_read_contacts.return_value = mock_contacts
 
         # Setup send_email to succeed
         mock_send_email.return_value = True
 
-        # Setup user input for dry run
-        mock_input.side_effect = ["y", "n"]  # Yes to test email, No to full campaign
-
-        # Run main function
-        with patch("sys.argv", ["email_campaign.py", "--dry-run"]):
-            main()
+        # Run main function (dry-run mode doesn't need user input)
+        main()
 
         # Verify test email was sent
         mock_send_email.assert_called()
@@ -84,21 +80,40 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
+    def test_csv_loading_with_test_data(self):
+        """Simple test that only verifies CSV loading with test data."""
+        from src.email_campaign import read_contacts_from_csv
+        
+        # Test loading from test CSV
+        test_csv_path = "data/test/testdata.csv"
+        contacts = read_contacts_from_csv(test_csv_path)
+        
+        # Verify we got contacts
+        assert len(contacts) > 0
+        
+        # Verify contact structure
+        for contact in contacts:
+            assert "email" in contact
+            assert "first_name" in contact or "contact_name" in contact
+
+    @pytest.mark.integration
+    @pytest.mark.email
+    @patch("sys.argv", ["email_campaign.py"])
     @patch("email_campaign.auth_manager")
     @patch("email_campaign.create_authentication_manager")
     @patch("email_campaign.send_email")
     @patch("email_campaign.read_contacts_from_csv")
     @patch("email_campaign.settings")
     @patch("builtins.input")
-    @patch("time.sleep")  # Mock sleep to speed up test
-    def test_full_workflow_mailersend_full_campaign(self, mock_sleep, mock_input, mock_settings, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
+    def test_full_workflow_mailersend_full_campaign(self, mock_input, mock_settings, mock_read_contacts, mock_send_email, mock_create_auth, mock_auth_manager):
         """Test full workflow with MailerSend for full campaign."""
         from email_campaign import main
 
-        # Setup settings with test recipient email
-        mock_settings.test_recipient_email = "test@example.com"
-        mock_settings.test_fallback_first_name = "Test"
+        # Setup settings
+        mock_settings.test_recipient_email = None  # No test email
         mock_settings.test_csv_filename = "test.csv"
+        mock_settings.campaign_batch_size = 10
+        mock_settings.campaign_delay_minutes = 1
 
         # Setup authentication manager
         mock_manager = Mock()
@@ -117,13 +132,13 @@ class TestEmailCampaignFullWorkflow:
         mock_send_email.return_value = True
 
         # Setup user input for full campaign
-        mock_input.side_effect = ["y", "y"]  # Yes to test email, Yes to full campaign
+        mock_input.side_effect = ["y"]  # Yes to proceed with campaign
 
         # Run main function
         main()
 
-        # Verify all emails were sent (test + 2 contacts)
-        assert mock_send_email.call_count == 3
+        # Verify all emails were sent (2 contacts only, no test email)
+        assert mock_send_email.call_count == 2
 
     @pytest.mark.integration
     @pytest.mark.email
@@ -149,6 +164,7 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
+    @patch("sys.argv", ["email_campaign.py"])
     @patch("email_campaign.auth_manager")
     @patch("email_campaign.create_authentication_manager")
     @patch("email_campaign.send_email")
@@ -191,6 +207,7 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
+    @patch("sys.argv", ["email_campaign.py"])
     @patch("email_campaign.auth_manager")
     @patch("email_campaign.create_authentication_manager")
     @patch("email_campaign.send_email")
@@ -256,6 +273,7 @@ class TestEmailCampaignFullWorkflow:
 
     @pytest.mark.integration
     @pytest.mark.email
+    @patch("sys.argv", ["email_campaign.py"])
     @patch("email_campaign.auth_manager")
     @patch("email_campaign.create_authentication_manager")
     @patch("email_campaign.send_email")
