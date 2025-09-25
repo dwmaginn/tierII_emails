@@ -74,7 +74,7 @@ def main():
     print("Next steps:")
     print("1. Update config.py with your email credentials")
     print("2. Run: python email_campaign.py")
-    print("3. The script will first send a test email to dwmaginn@gmail.com")
+    print("3. The script will first send a test email to your configured test recipient")
     print("4. After you confirm the test worked, it will ask for approval to send to all contacts")
     print("="*60)
 

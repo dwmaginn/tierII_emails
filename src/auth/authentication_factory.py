@@ -88,8 +88,13 @@ class AuthenticationFactory:
                 raise ValueError(f"Provider {provider.value} is not registered")
 
             manager_class = self._providers[provider]
+            
+            # Create manager instance using standard configuration approach
             manager = manager_class(provider)
-            manager.set_configuration(config)
+            
+            # Set configuration using the standard method
+            if config:
+                manager.set_configuration(config)
 
             if not manager.validate_configuration():
                 raise AuthenticationError(
@@ -108,8 +113,8 @@ class AuthenticationFactory:
                 return self.create_manager(detected_provider, config, auto_detect=False)
 
         raise AuthenticationError(
-            "No suitable authentication provider found",
-            AuthenticationProvider.MICROSOFT_OAUTH,  # Default for error reporting
+            "No suitable authentication provider found - only MailerSend is supported",
+            AuthenticationProvider.MAILERSEND,  # Default for error reporting
         )
 
     def create_with_fallback(
@@ -167,31 +172,13 @@ class AuthenticationFactory:
         Returns:
             Detected provider or None if detection fails
         """
-        # Check for Microsoft OAuth configuration
-        microsoft_keys = ["tenant_id", "client_id", "client_secret"]
-        if all(key in config for key in microsoft_keys):
-            self._logger.debug("Detected Microsoft OAuth configuration")
-            return AuthenticationProvider.MICROSOFT_OAUTH
+        # Check for MailerSend configuration
+        mailersend_keys = ["mailersend_api_token"]
+        if all(key in config for key in mailersend_keys):
+            self._logger.debug("Detected MailerSend configuration")
+            return AuthenticationProvider.MAILERSEND
 
-        # Check for Gmail App Password configuration
-        gmail_keys = ["gmail_app_password", "gmail_sender_email"]
-        if all(key in config for key in gmail_keys):
-            self._logger.debug("Detected Gmail App Password configuration")
-            return AuthenticationProvider.GMAIL_APP_PASSWORD
-
-        # Check SMTP server-based detection
-        smtp_server = config.get("smtp_server", "").lower()
-        if (
-            "outlook.office365.com" in smtp_server
-            or "smtp.office365.com" in smtp_server
-        ):
-            self._logger.debug("Detected Microsoft SMTP server")
-            return AuthenticationProvider.MICROSOFT_OAUTH
-        elif "smtp.gmail.com" in smtp_server:
-            self._logger.debug("Detected Gmail SMTP server")
-            return AuthenticationProvider.GMAIL_APP_PASSWORD
-
-        self._logger.warning("Could not auto-detect authentication provider")
+        self._logger.warning("Could not auto-detect authentication provider - only MailerSend is supported")
         return None
 
     def validate_provider_config(
@@ -211,8 +198,12 @@ class AuthenticationFactory:
 
         try:
             manager_class = self._providers[provider]
-            temp_manager = manager_class(provider)
-            temp_manager.set_configuration(config)
+            if provider == AuthenticationProvider.MAILERSEND:
+                from types import SimpleNamespace
+                settings = SimpleNamespace(**config)
+                temp_manager = manager_class(settings)
+            else:
+                raise ValueError(f"Unsupported provider: {provider.value}")
             return temp_manager.validate_configuration()
         except Exception as e:
             self._logger.error(

@@ -3,7 +3,7 @@ import os
 import tempfile
 
 # Import from the project's config module
-from config.settings import get_settings
+from src.config.settings import load_settings
 
 
 def test_env_file_loading():
@@ -11,13 +11,9 @@ def test_env_file_loading():
     # Create a temporary .env file
     env_content = """
 # Test environment configuration
-SMTP_SERVER=test.smtp.com
-SMTP_PORT=587
-EMAIL_ADDRESS=test@example.com
-EMAIL_PASSWORD=test_password
-OAUTH_CLIENT_ID=test_client_id
-OAUTH_CLIENT_SECRET=test_client_secret
-OAUTH_REFRESH_TOKEN=test_refresh_token
+TIERII_SENDER_EMAIL=test@example.com
+TIERII_EMAIL_SUBJECT=Test Subject
+TIERII_MAILERSEND_API_TOKEN=test_api_token_12345
 """
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
@@ -26,7 +22,7 @@ OAUTH_REFRESH_TOKEN=test_refresh_token
 
     try:
         # Test that we can load settings (this should work regardless of .env file)
-        settings = get_settings()
+        settings = load_settings()
         assert settings is not None
         print(f"✓ Successfully loaded settings: {type(settings)}")
 
@@ -39,9 +35,9 @@ OAUTH_REFRESH_TOKEN=test_refresh_token
 def test_basic_import():
     """Test that we can import the settings module."""
     try:
-        from config.settings import get_settings
+        from src.config.settings import load_settings
 
-        settings = get_settings()
+        settings = load_settings()
         assert settings is not None
         print(f"✓ Successfully imported and loaded settings: {type(settings)}")
 

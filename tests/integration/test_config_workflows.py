@@ -1,266 +1,291 @@
-"""Integration tests for configuration-specific email workflows.
+"""Integration tests for MailerSend configuration workflows.
 
 These tests verify that the full email workflow functions correctly
-with different user configurations (David's Microsoft OAuth and Luke's Gmail SMTP)
-while using test data to prevent unintended email sends.
+with MailerSend configuration while using test data to prevent unintended email sends.
 """
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from tests.fixtures import (
-    get_david_config,
-    apply_david_config,
-    clear_david_config,
-    get_luke_config,
-    apply_luke_config,
-    clear_luke_config,
-)
 
+class TestMailerSendWorkflow:
+    """Test MailerSend email workflow."""
 
-class TestDavidMicrosoftWorkflow:
-    """Test David's Microsoft OAuth email workflow."""
-
-    def setup_method(self):
-        """Set up David's configuration before each test."""
-        apply_david_config()
-
-    def teardown_method(self):
-        """Clean up David's configuration after each test."""
-        clear_david_config()
+    @pytest.fixture
+    def mailersend_config(self):
+        """Provide MailerSend configuration for testing."""
+        return {
+            'TIERII_SENDER_EMAIL': 'test@honestpharmco.com',
+            'TIERII_MAILERSEND_API_TOKEN': 'test-mailersend-token',
+            'TIERII_SENDER_NAME': 'Test Sender',
+            'TIERII_CAMPAIGN_BATCH_SIZE': '5',
+            'TIERII_CAMPAIGN_DELAY_MINUTES': '1',
+            'TIERII_TEST_RECIPIENT_EMAIL': 'test@example.com',
+            'TIERII_TEST_FALLBACK_FIRST_NAME': 'Friend',
+            'TIERII_TEST_CSV_FILENAME': 'data/test/testdata.csv'
+        }
 
     @pytest.mark.integration
-    @pytest.mark.oauth
-    def test_david_config_loading(self):
-        """Test that David's configuration loads correctly."""
-        from src.config.settings import load_settings
+    @pytest.mark.mailersend
+    def test_mailersend_config_loading(self, mailersend_config):
+        """Test that MailerSend configuration loads correctly."""
+        with patch.dict(os.environ, mailersend_config):
+            from config.settings import load_settings
 
-        settings = load_settings()
+            settings = load_settings()
 
-        # Verify core email settings
-        assert settings.sender_email == "david@honestpharmco.com"
-        assert settings.smtp_server == "smtp.office365.com"
-        assert settings.smtp_port == 587
+            # Verify core email settings
+            assert settings.sender_email == "test@honestpharmco.com"
+            assert settings.mailersend_api_token == "test-mailersend-token"
+            assert settings.sender_name == "Test Sender"
 
-        # Verify authentication provider
-        assert settings.auth_provider == "microsoft"
+            # Verify campaign settings
+            assert settings.campaign_batch_size == 5
+            assert settings.campaign_delay_minutes == 1
 
-        # Verify Microsoft OAuth settings
-        assert settings.tenant_id == "test-tenant-id-david"
-        assert settings.client_id == "test-client-id-david"
-        assert settings.client_secret == "test-client-secret-david"
-
-        # Verify email content
-        assert "Honest Pharmco" in settings.email_subject
-        assert "David" in settings.smtp_sender_name
+            # Verify test settings
+            assert settings.test_recipient_email == "test@example.com"
+            assert settings.test_fallback_first_name == "Friend"
 
     @pytest.mark.integration
-    @pytest.mark.oauth
-    def test_david_csv_data_loading(self):
-        """Test that David's configuration uses testdata.csv."""
-        from src.utils.csv_reader import load_contacts
+    @pytest.mark.mailersend
+    def test_mailersend_authentication_manager_creation(self, mailersend_config):
+        """Test that MailerSend authentication manager is created correctly."""
+        with patch.dict(os.environ, mailersend_config):
+            from email_campaign import create_authentication_manager
+            from auth.base_authentication_manager import AuthenticationProvider
 
-        # Load contacts using David's configuration
-        contacts = load_contacts()
+            with patch('email_campaign.authentication_factory') as mock_factory, \
+                 patch('email_campaign.settings') as mock_settings:
+                
+                # Configure mock settings with test values
+                mock_settings.mailersend_api_token = "test-mailersend-token"
+                mock_settings.sender_email = "test@honestpharmco.com"
+                mock_settings.sender_name = "Test Sender"
+                
+                mock_manager = Mock()
+                mock_factory.create_manager.return_value = mock_manager
 
-        # Verify we're using test data
-        assert len(contacts) == 3  # testdata.csv has 3 records
+                manager = create_authentication_manager()
 
-        # Verify test email addresses are present
-        test_emails = [contact["Email"] for contact in contacts]
-        assert "edwards.lukec@gmail.com" in test_emails
-        assert "73spider73@gmail.com" in test_emails
-        assert "lce1868@rit.edu" in test_emails
-
-    @pytest.mark.integration
-    @pytest.mark.oauth
-    @patch("src.auth.oauth_token_manager.OAuthTokenManager.get_access_token")
-    @patch("src.email_utils.smtp_client.SMTPClient.send_email")
-    def test_david_full_workflow_dry_run(self, mock_send_email, mock_get_token):
-        """Test David's full email workflow in dry run mode."""
-        # Mock OAuth token response
-        mock_get_token.return_value = "mock-access-token"
-
-        # Mock email sending (should not be called in dry run)
-        mock_send_email.return_value = True
-
-        from src.email_campaign import EmailCampaign
-
-        campaign = EmailCampaign()
-        result = campaign.send_campaign()
-
-        # Verify dry run behavior
-        assert result is not None
-        # In dry run mode, emails should not actually be sent
-        mock_send_email.assert_not_called()
-
-
-class TestLukeGmailWorkflow:
-    """Test Luke's Gmail SMTP email workflow."""
-
-    def setup_method(self):
-        """Set up Luke's configuration before each test."""
-        apply_luke_config()
-
-    def teardown_method(self):
-        """Clean up Luke's configuration after each test."""
-        clear_luke_config()
+                assert manager == mock_manager
+                mock_factory.create_manager.assert_called_once_with(
+                    provider=AuthenticationProvider.MAILERSEND,
+                    config={
+                        "mailersend_api_token": "test-mailersend-token",
+                        "sender_email": "test@honestpharmco.com",
+                        "sender_name": "Test Sender"
+                    }
+                )
 
     @pytest.mark.integration
-    @pytest.mark.email
-    def test_luke_config_loading(self):
-        """Test that Luke's configuration loads correctly."""
-        from src.config.settings import load_settings
+    @pytest.mark.mailersend
+    def test_mailersend_email_sending_workflow(self, mailersend_config):
+        """Test complete MailerSend email sending workflow."""
+        with patch.dict(os.environ, mailersend_config):
+            from src.email_campaign import send_email
 
-        settings = load_settings()
+            # Mock the authentication manager
+            mock_manager = Mock()
+            mock_manager.send_email.return_value = True
 
-        # Verify core email settings
-        assert settings.sender_email == "edwards.lukec@gmail.com"
-        assert settings.smtp_server == "smtp.gmail.com"
-        assert settings.smtp_port == 587
+            with patch('src.email_campaign.auth_manager', mock_manager):
+                result = send_email("test@example.com", "John")
 
-        # Verify authentication provider
-        assert settings.auth_provider == "gmail"
-
-        # Verify Gmail settings
-        assert settings.gmail_username == "edwards.lukec@gmail.com"
-        assert settings.gmail_app_password == "test-app-password-luke"
-
-        # Verify email content
-        assert "AI Auto Coach" in settings.email_subject
-        assert "Luke" in settings.smtp_sender_name
+                assert result is True
+                mock_manager.send_email.assert_called_once()
+                call_args = mock_manager.send_email.call_args
+                assert call_args[1]['to_email'] == "test@example.com"
+                assert 'html_content' in call_args[1]
+                assert "Hi John," in call_args[1]['html_content']
 
     @pytest.mark.integration
-    @pytest.mark.email
-    def test_luke_csv_data_loading(self):
-        """Test that Luke's configuration uses testdata.csv."""
-        from src.utils.csv_reader import load_contacts
+    @pytest.mark.mailersend
+    def test_mailersend_campaign_workflow(self, mailersend_config):
+        """Test complete MailerSend campaign workflow."""
+        with patch.dict(os.environ, mailersend_config):
+            from src.email_campaign import EmailCampaign
 
-        # Load contacts using Luke's configuration
-        contacts = load_contacts()
+            # Mock CSV reading and email sending
+            mock_contacts = [
+                {"email": "test1@example.com", "first_name": "John", "contact_name": "John Doe"},
+                {"email": "test2@example.com", "first_name": "Jane", "contact_name": "Jane Smith"}
+            ]
 
-        # Verify we're using test data
-        assert len(contacts) == 3  # testdata.csv has 3 records
+            with patch('src.email_campaign.read_contacts_from_csv') as mock_read_csv, \
+                 patch('src.email_campaign.send_email') as mock_send_email, \
+                 patch('time.sleep'):  # Mock sleep to speed up test
 
-        # Verify test email addresses are present
-        test_emails = [contact["Email"] for contact in contacts]
-        assert "edwards.lukec@gmail.com" in test_emails
-        assert "73spider73@gmail.com" in test_emails
-        assert "lce1868@rit.edu" in test_emails
+                mock_read_csv.return_value = mock_contacts
+                mock_send_email.return_value = True
 
-    @pytest.mark.integration
-    @pytest.mark.email
-    @patch("src.email_utils.smtp_client.SMTPClient.send_email")
-    def test_luke_full_workflow_dry_run(self, mock_send_email):
-        """Test Luke's full email workflow in dry run mode."""
-        # Mock email sending (should not be called in dry run)
-        mock_send_email.return_value = True
+                campaign = EmailCampaign(batch_size=1, delay_minutes=0)
+                contacts_loaded = campaign.load_contacts()
+                total_sent = campaign.send_campaign()
 
-        from src.email_campaign import EmailCampaign
-
-        campaign = EmailCampaign()
-        result = campaign.send_campaign()
-
-        # Verify dry run behavior
-        assert result is not None
-        # In dry run mode, emails should not actually be sent
-        mock_send_email.assert_not_called()
-
-
-class TestConfigurationIsolation:
-    """Test that configurations are properly isolated between tests."""
+                assert contacts_loaded == 2
+                assert total_sent == 2
+                assert mock_send_email.call_count == 2
 
     @pytest.mark.integration
-    def test_config_isolation_david_to_luke(self):
-        """Test switching from David's config to Luke's config."""
-        # Apply David's config
-        apply_david_config()
+    @pytest.mark.mailersend
+    def test_mailersend_error_handling(self, mailersend_config):
+        """Test MailerSend error handling in workflow."""
+        with patch.dict(os.environ, mailersend_config):
+            from src.email_campaign import send_email
+            from src.auth.base_authentication_manager import AuthenticationError, AuthenticationProvider
 
-        from src.config.settings import load_settings
+            # Mock authentication manager that fails
+            mock_manager = Mock()
+            mock_manager.send_email.side_effect = AuthenticationError("API token invalid", AuthenticationProvider.MAILERSEND)
 
-        david_settings = load_settings()
-        assert david_settings.auth_provider == "microsoft"
-        assert "david@honestpharmco.com" == david_settings.sender_email
+            with patch('src.email_campaign.auth_manager', mock_manager), \
+                 patch('time.sleep'):  # Mock sleep to speed up test
 
-        # Clear David's config and apply Luke's
-        clear_david_config()
-        apply_luke_config()
+                result = send_email("test@example.com", "John", max_retries=2)
 
-        # Reload settings to get Luke's config
-        luke_settings = load_settings()
-        assert luke_settings.auth_provider == "gmail"
-        assert "edwards.lukec@gmail.com" == luke_settings.sender_email
-
-        # Clean up
-        clear_luke_config()
+                assert result is False
+                assert mock_manager.send_email.call_count == 2  # Should retry
 
     @pytest.mark.integration
-    def test_config_isolation_luke_to_david(self):
-        """Test switching from Luke's config to David's config."""
-        # Apply Luke's config
-        apply_luke_config()
+    @pytest.mark.mailersend
+    def test_mailersend_configuration_validation(self, mailersend_config):
+        """Test MailerSend configuration validation."""
+        # Test with missing API token
+        incomplete_config = mailersend_config.copy()
+        del incomplete_config['TIERII_MAILERSEND_API_TOKEN']
+        
+        # Explicitly unset the API token in environment
+        env_patch = incomplete_config.copy()
+        env_patch['TIERII_MAILERSEND_API_TOKEN'] = ''
 
-        from src.config.settings import load_settings
+        with patch.dict(os.environ, env_patch):
+            from config.settings import load_settings
 
-        luke_settings = load_settings()
-        assert luke_settings.auth_provider == "gmail"
-        assert "edwards.lukec@gmail.com" == luke_settings.sender_email
+            with pytest.raises(SystemExit):
+                load_settings()
 
-        # Clear Luke's config and apply David's
-        clear_luke_config()
-        apply_david_config()
+        # Test with missing sender email
+        incomplete_config = mailersend_config.copy()
+        del incomplete_config['TIERII_SENDER_EMAIL']
+        
+        # Explicitly unset the sender email in environment
+        env_patch = incomplete_config.copy()
+        env_patch['TIERII_SENDER_EMAIL'] = ''
 
-        # Reload settings to get David's config
-        david_settings = load_settings()
-        assert david_settings.auth_provider == "microsoft"
-        assert "david@honestpharmco.com" == david_settings.sender_email
-
-        # Clean up
-        clear_david_config()
-
-
-class TestTestDataSafety:
-    """Test that configurations properly use test data to prevent unintended emails."""
-
-    @pytest.mark.integration
-    def test_david_uses_test_data_path(self):
-        """Test that David's config points to testdata.csv."""
-        apply_david_config()
-
-        config = get_david_config()
-        csv_path = config.get("TIERII_CSV_FILE_PATH")
-
-        assert csv_path is not None
-        assert "testdata.csv" in csv_path
-        assert "test" in csv_path.lower()
-
-        clear_david_config()
+        with patch.dict(os.environ, env_patch):
+            with pytest.raises(SystemExit):
+                load_settings()
 
     @pytest.mark.integration
-    def test_luke_uses_test_data_path(self):
-        """Test that Luke's config points to testdata.csv."""
-        apply_luke_config()
+    @pytest.mark.mailersend
+    def test_mailersend_test_mode_workflow(self, mailersend_config):
+        """Test MailerSend workflow in test mode."""
+        with patch.dict(os.environ, mailersend_config):
+            from config.settings import load_settings
 
-        config = get_luke_config()
-        csv_path = config.get("TIERII_CSV_FILE_PATH")
+            # Test mode requires test recipient email
+            settings = load_settings(test_mode=True)
 
-        assert csv_path is not None
-        assert "testdata.csv" in csv_path
-        assert "test" in csv_path.lower()
-
-        clear_luke_config()
+            assert settings.test_recipient_email == "test@example.com"
+            assert settings.sender_email == "test@honestpharmco.com"
+            assert settings.mailersend_api_token == "test-mailersend-token"
 
     @pytest.mark.integration
-    def test_dry_run_enabled_by_default(self):
-        """Test that dry run is enabled by default in test fixtures."""
-        # Test David's config
-        david_config = get_david_config()
-        assert david_config.get("TIERII_DRY_RUN") == "true"
+    @pytest.mark.mailersend
+    def test_mailersend_batch_processing(self, mailersend_config):
+        """Test MailerSend batch processing workflow."""
+        with patch.dict(os.environ, mailersend_config):
+            from src.email_campaign import send_batch_emails
 
-        # Test Luke's config
-        luke_config = get_luke_config()
-        assert luke_config.get("TIERII_DRY_RUN") == "true"
+            contacts = [
+                {"email": "test1@example.com", "first_name": "John"},
+                {"email": "test2@example.com", "first_name": "Jane"},
+                {"email": "test3@example.com", "first_name": "Bob"},
+            ]
+
+            with patch('src.email_campaign.send_email') as mock_send_email, \
+                 patch('time.sleep'):  # Mock sleep to speed up test
+
+                mock_send_email.return_value = True
+
+                successful_sends, next_index = send_batch_emails(contacts, 0, 2)
+
+                assert successful_sends == 2
+                assert next_index == 2
+                assert mock_send_email.call_count == 2
+                mock_send_email.assert_any_call("test1@example.com", "John")
+                mock_send_email.assert_any_call("test2@example.com", "Jane")
+
+
+class TestMailerSendConfigurationEdgeCases:
+    """Test edge cases and error conditions for MailerSend configuration."""
+
+    @pytest.mark.integration
+    @pytest.mark.mailersend
+    def test_empty_environment_variables(self):
+        """Test behavior with empty environment variables."""
+        # Explicitly set required fields to empty to trigger validation
+        empty_config = {
+            'TIERII_SENDER_EMAIL': '',
+            'TIERII_MAILERSEND_API_TOKEN': ''
+        }
+        with patch.dict(os.environ, empty_config):
+            from config.settings import load_settings
+
+            with pytest.raises(SystemExit):
+                load_settings()
+
+    @pytest.mark.integration
+    @pytest.mark.mailersend
+    def test_invalid_batch_size_configuration(self):
+        """Test handling of invalid batch size configuration."""
+        config = {
+            'TIERII_SENDER_EMAIL': 'test@example.com',
+            'TIERII_MAILERSEND_API_TOKEN': 'test-token',
+            'TIERII_CAMPAIGN_BATCH_SIZE': '0'  # Invalid batch size
+        }
+
+        with patch.dict(os.environ, config):
+            from config.settings import load_settings
+
+            with pytest.raises(SystemExit):  # Should fail validation
+                load_settings()
+
+    @pytest.mark.integration
+    @pytest.mark.mailersend
+    def test_invalid_delay_configuration(self):
+        """Test handling of invalid delay configuration."""
+        config = {
+            'TIERII_SENDER_EMAIL': 'test@example.com',
+            'TIERII_MAILERSEND_API_TOKEN': 'test-token',
+            'TIERII_CAMPAIGN_DELAY_MINUTES': '-1'  # Invalid delay
+        }
+
+        with patch.dict(os.environ, config):
+            from src.config.settings import load_settings
+
+            with pytest.raises(SystemExit):  # Should fail validation
+                load_settings()
+
+    @pytest.mark.integration
+    @pytest.mark.mailersend
+    def test_sender_name_derivation(self):
+        """Test automatic sender name derivation from email."""
+        config = {
+            'TIERII_SENDER_EMAIL': 'john.doe@example.com',
+            'TIERII_MAILERSEND_API_TOKEN': 'test-token'
+            # No TIERII_SENDER_NAME provided
+        }
+
+        with patch.dict(os.environ, config):
+            from src.config.settings import load_settings
+
+            settings = load_settings()
+
+            # Should derive sender name from email
+            assert settings.sender_name == "John Doe"  # Derived from john.doe@example.com

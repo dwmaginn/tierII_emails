@@ -1,7 +1,7 @@
 """Unit tests for AuthenticationFactory class.
 
 This module provides comprehensive tests for the AuthenticationFactory
-class, testing provider registration, auto-detection, and manager creation.
+class, testing provider registration and MailerSend manager creation.
 """
 
 import pytest
@@ -21,11 +21,12 @@ from auth.base_authentication_manager import (
 )
 
 
-class MockAuthenticationManager(BaseAuthenticationManager):
-    """Mock authentication manager for testing."""
+class MockMailerSendManager(BaseAuthenticationManager):
+    """Mock MailerSend authentication manager for testing."""
 
-    def __init__(self, provider: AuthenticationProvider):
-        super().__init__(provider)
+    def __init__(self, settings):
+        super().__init__(AuthenticationProvider.MAILERSEND)
+        self.settings = settings
         self._mock_valid_config = True
         self._mock_auth_success = True
 
@@ -36,16 +37,18 @@ class MockAuthenticationManager(BaseAuthenticationManager):
         return self._mock_auth_success
 
     def get_access_token(self, force_refresh: bool = False) -> str:
-        return "mock_token"
+        return "mock_mailersend_token"
 
     def is_token_valid(self, token=None) -> bool:
         return True
 
     def refresh_token(self) -> str:
-        return "refreshed_token"
+        return "refreshed_mailersend_token"
 
-    def get_smtp_auth_string(self, username: str, token=None) -> str:
-        return f"mock_auth_{username}"
+    def send_email(self, recipient_email: str, subject: str, body: str, 
+                   sender_email: str, sender_name: str) -> bool:
+        """Mock email sending method."""
+        return True
 
     def validate_configuration(self) -> bool:
         return self._mock_valid_config
@@ -53,7 +56,6 @@ class MockAuthenticationManager(BaseAuthenticationManager):
 
 class InvalidManager:
     """Invalid manager class that doesn't inherit from BaseAuthenticationManager."""
-
     pass
 
 
@@ -67,305 +69,62 @@ class TestAuthenticationFactory:
     def test_factory_initialization(self):
         """Test that factory initializes properly."""
         assert isinstance(self.factory._providers, dict)
-        assert len(self.factory._providers) == 0
         assert self.factory._logger is not None
 
     def test_register_provider_success(self):
         """Test successful provider registration."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        assert AuthenticationProvider.MAILERSEND in self.factory._providers
+        assert self.factory._providers[AuthenticationProvider.MAILERSEND] == MockMailerSendManager
 
-        self.factory.register_provider(provider, MockAuthenticationManager)
-
-        assert provider in self.factory._providers
-        assert self.factory._providers[provider] == MockAuthenticationManager
-
-    def test_register_provider_invalid_class(self):
+    def test_register_provider_invalid_manager(self):
         """Test registration with invalid manager class."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
+        with pytest.raises(ValueError, match="Manager class .* must inherit from BaseAuthenticationManager"):
+            self.factory.register_provider(
+                AuthenticationProvider.MAILERSEND, InvalidManager
+            )
 
-        with pytest.raises(ValueError) as exc_info:
-            self.factory.register_provider(provider, InvalidManager)
-
-        assert "must inherit from BaseAuthenticationManager" in str(exc_info.value)
-
-    def test_get_available_providers_empty(self):
-        """Test getting available providers when none registered."""
-        providers = self.factory.get_available_providers()
-        assert providers == []
-
-    def test_get_available_providers_with_registered(self):
-        """Test getting available providers with registered providers."""
-        provider1 = AuthenticationProvider.MICROSOFT_OAUTH
-        provider2 = AuthenticationProvider.GMAIL_APP_PASSWORD
-
-        self.factory.register_provider(provider1, MockAuthenticationManager)
-        self.factory.register_provider(provider2, MockAuthenticationManager)
-
-        providers = self.factory.get_available_providers()
-        assert len(providers) == 2
-        assert provider1 in providers
-        assert provider2 in providers
-
-    def test_create_manager_with_specific_provider(self):
-        """Test creating manager with specific provider."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
-        config = {"tenant_id": "test", "client_id": "test", "client_secret": "test"}
-
-        self.factory.register_provider(provider, MockAuthenticationManager)
-
-        manager = self.factory.create_manager(provider=provider, config=config)
-
-        assert isinstance(manager, MockAuthenticationManager)
-        assert manager.provider == provider
-        assert manager.get_configuration() == config
+    def test_create_manager_mailersend_success(self):
+        """Test successful MailerSend manager creation."""
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        config = {
+            "mailersend_api_token": "test_token",
+            "sender_email": "test@example.com",
+            "sender_name": "Test Sender"
+        }
+        
+        manager = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        
+        assert isinstance(manager, MockMailerSendManager)
+        assert manager.provider == AuthenticationProvider.MAILERSEND
 
     def test_create_manager_unregistered_provider(self):
-        """Test creating manager with unregistered provider."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
+        """Test creation with unregistered provider."""
+        config = {"mailersend_api_token": "test_token"}
+        
+        with pytest.raises(ValueError, match="Provider .* is not registered"):
+            self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
 
-        with pytest.raises(ValueError) as exc_info:
-            self.factory.create_manager(provider=provider)
-
-        assert "is not registered" in str(exc_info.value)
-
-    def test_create_manager_invalid_configuration(self):
-        """Test creating manager with invalid configuration."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
-        config = {"invalid": "config"}
-
-        self.factory.register_provider(provider, MockAuthenticationManager)
-
-        # Mock the manager to return invalid configuration
-        with patch.object(
-            MockAuthenticationManager, "validate_configuration", return_value=False
-        ):
-            with pytest.raises(AuthenticationError) as exc_info:
-                self.factory.create_manager(provider=provider, config=config)
-
-            assert "Invalid configuration" in str(exc_info.value)
-
-    def test_create_manager_auto_detect_microsoft(self):
-        """Test auto-detection of Microsoft OAuth provider."""
-        config = {
-            "tenant_id": "test-tenant",
-            "client_id": "test-client",
-            "client_secret": "test-secret",
-        }
-
-        self.factory.register_provider(
-            AuthenticationProvider.MICROSOFT_OAUTH, MockAuthenticationManager
-        )
-
-        manager = self.factory.create_manager(config=config, auto_detect=True)
-
-        assert isinstance(manager, MockAuthenticationManager)
-        assert manager.provider == AuthenticationProvider.MICROSOFT_OAUTH
-
-    def test_create_manager_auto_detect_gmail(self):
-        """Test auto-detection of Gmail App Password provider."""
-        config = {
-            "gmail_app_password": "test-password",
-            "gmail_sender_email": "test@gmail.com",
-        }
-
-        self.factory.register_provider(
-            AuthenticationProvider.GMAIL_APP_PASSWORD, MockAuthenticationManager
-        )
-
-        manager = self.factory.create_manager(config=config, auto_detect=True)
-
-        assert isinstance(manager, MockAuthenticationManager)
-        assert manager.provider == AuthenticationProvider.GMAIL_APP_PASSWORD
-
-    def test_create_manager_auto_detect_smtp_server_outlook(self):
-        """Test auto-detection based on Outlook SMTP server."""
-        config = {"smtp_server": "smtp.office365.com"}
-
-        self.factory.register_provider(
-            AuthenticationProvider.MICROSOFT_OAUTH, MockAuthenticationManager
-        )
-
-        manager = self.factory.create_manager(config=config, auto_detect=True)
-
-        assert manager.provider == AuthenticationProvider.MICROSOFT_OAUTH
-
-    def test_create_manager_auto_detect_smtp_server_gmail(self):
-        """Test auto-detection based on Gmail SMTP server."""
-        config = {"smtp_server": "smtp.gmail.com"}
-
-        self.factory.register_provider(
-            AuthenticationProvider.GMAIL_APP_PASSWORD, MockAuthenticationManager
-        )
-
-        manager = self.factory.create_manager(config=config, auto_detect=True)
-
-        assert manager.provider == AuthenticationProvider.GMAIL_APP_PASSWORD
-
-    def test_create_manager_auto_detect_fails(self):
-        """Test auto-detection failure when no suitable provider found."""
-        config = {"unknown": "config"}
-
-        with pytest.raises(AuthenticationError) as exc_info:
-            self.factory.create_manager(config=config, auto_detect=True)
-
-        assert "No suitable authentication provider found" in str(exc_info.value)
-
-    def test_create_manager_no_auto_detect_no_provider(self):
-        """Test creation failure when auto-detect disabled and no provider specified."""
-        config = {"test": "config"}
-
-        with pytest.raises(AuthenticationError):
-            self.factory.create_manager(config=config, auto_detect=False)
-
-    def test_create_with_fallback_success_primary(self):
-        """Test fallback creation with successful primary provider."""
-        primary = AuthenticationProvider.MICROSOFT_OAUTH
-        fallback = [AuthenticationProvider.GMAIL_APP_PASSWORD]
-        config = {"tenant_id": "test", "client_id": "test", "client_secret": "test"}
-
-        self.factory.register_provider(primary, MockAuthenticationManager)
-        self.factory.register_provider(
-            AuthenticationProvider.GMAIL_APP_PASSWORD, MockAuthenticationManager
-        )
-
-        manager = self.factory.create_with_fallback(primary, fallback, config)
-
-        assert manager.provider == primary
-
-    def test_create_with_fallback_success_fallback(self):
-        """Test fallback creation with failed primary but successful fallback."""
-        primary = AuthenticationProvider.MICROSOFT_OAUTH
-        fallback = [AuthenticationProvider.GMAIL_APP_PASSWORD]
-        config = {"gmail_app_password": "test", "gmail_sender_email": "test@gmail.com"}
-
-        # Register providers with different validation behavior
-        class FailingManager(MockAuthenticationManager):
-            def validate_configuration(self):
+    def test_create_manager_invalid_config(self):
+        """Test creation with invalid configuration."""
+        # Mock a manager that fails validation
+        class InvalidConfigManager(MockMailerSendManager):
+            def validate_configuration(self) -> bool:
                 return False
-
-        self.factory.register_provider(primary, FailingManager)
+        
         self.factory.register_provider(
-            AuthenticationProvider.GMAIL_APP_PASSWORD, MockAuthenticationManager
+            AuthenticationProvider.MAILERSEND, InvalidConfigManager
         )
-
-        manager = self.factory.create_with_fallback(primary, fallback, config)
-
-        assert manager.provider == AuthenticationProvider.GMAIL_APP_PASSWORD
-
-    def test_create_with_fallback_all_fail(self):
-        """Test fallback creation when all providers fail."""
-        primary = AuthenticationProvider.MICROSOFT_OAUTH
-        fallback = [AuthenticationProvider.GMAIL_APP_PASSWORD]
+        
         config = {"invalid": "config"}
-
-        class FailingManager(MockAuthenticationManager):
-            def validate_configuration(self):
-                return False
-
-        self.factory.register_provider(primary, FailingManager)
-        self.factory.register_provider(
-            AuthenticationProvider.GMAIL_APP_PASSWORD, FailingManager
-        )
-
-        with pytest.raises(AuthenticationError) as exc_info:
-            self.factory.create_with_fallback(primary, fallback, config)
-
-        assert "All authentication providers failed" in str(exc_info.value)
-
-    def test_validate_provider_config_success(self):
-        """Test successful provider configuration validation."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
-        config = {"valid": "config"}
-
-        self.factory.register_provider(provider, MockAuthenticationManager)
-
-        result = self.factory.validate_provider_config(provider, config)
-        assert result is True
-
-    def test_validate_provider_config_unregistered(self):
-        """Test validation with unregistered provider."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
-        config = {"test": "config"}
-
-        result = self.factory.validate_provider_config(provider, config)
-        assert result is False
-
-    def test_validate_provider_config_invalid(self):
-        """Test validation with invalid configuration."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
-        config = {"invalid": "config"}
-
-        class FailingManager(MockAuthenticationManager):
-            def validate_configuration(self):
-                return False
-
-        self.factory.register_provider(provider, FailingManager)
-
-        result = self.factory.validate_provider_config(provider, config)
-        assert result is False
-
-    def test_validate_provider_config_exception(self):
-        """Test validation when exception occurs."""
-        provider = AuthenticationProvider.MICROSOFT_OAUTH
-        config = {"test": "config"}
-
-        class ExceptionManager(MockAuthenticationManager):
-            def validate_configuration(self):
-                raise Exception("Validation error")
-
-        self.factory.register_provider(provider, ExceptionManager)
-
-        result = self.factory.validate_provider_config(provider, config)
-        assert result is False
-
-    def test_detect_provider_microsoft_keys(self):
-        """Test provider detection with Microsoft OAuth keys."""
-        config = {
-            "tenant_id": "test-tenant",
-            "client_id": "test-client",
-            "client_secret": "test-secret",
-        }
-
-        detected = self.factory._detect_provider(config)
-        assert detected == AuthenticationProvider.MICROSOFT_OAUTH
-
-    def test_detect_provider_gmail_keys(self):
-        """Test provider detection with Gmail App Password keys."""
-        config = {
-            "gmail_app_password": "test-password",
-            "gmail_sender_email": "test@gmail.com",
-        }
-
-        detected = self.factory._detect_provider(config)
-        assert detected == AuthenticationProvider.GMAIL_APP_PASSWORD
-
-    def test_detect_provider_outlook_smtp(self):
-        """Test provider detection with Outlook SMTP server."""
-        config = {"smtp_server": "outlook.office365.com"}
-
-        detected = self.factory._detect_provider(config)
-        assert detected == AuthenticationProvider.MICROSOFT_OAUTH
-
-    def test_detect_provider_gmail_smtp(self):
-        """Test provider detection with Gmail SMTP server."""
-        config = {"smtp_server": "smtp.gmail.com"}
-
-        detected = self.factory._detect_provider(config)
-        assert detected == AuthenticationProvider.GMAIL_APP_PASSWORD
-
-    def test_detect_provider_no_match(self):
-        """Test provider detection with no matching configuration."""
-        config = {"unknown": "config"}
-
-        detected = self.factory._detect_provider(config)
-        assert detected is None
-
-    def test_detect_provider_case_insensitive_smtp(self):
-        """Test provider detection is case insensitive for SMTP servers."""
-        config = {"smtp_server": "SMTP.GMAIL.COM"}
-
-        detected = self.factory._detect_provider(config)
-        assert detected == AuthenticationProvider.GMAIL_APP_PASSWORD
+        
+        with pytest.raises(AuthenticationError, match="Invalid configuration"):
+            self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
 
 
 class TestAuthenticationFactoryIntegration:
@@ -375,68 +134,230 @@ class TestAuthenticationFactoryIntegration:
         """Set up test fixtures."""
         self.factory = AuthenticationFactory()
         self.factory.register_provider(
-            AuthenticationProvider.MICROSOFT_OAUTH, MockAuthenticationManager
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
         )
+
+    def test_end_to_end_mailersend_workflow(self):
+        """Test complete MailerSend authentication workflow."""
+        config = {
+            "mailersend_api_token": "test_token",
+            "sender_email": "test@example.com",
+            "sender_name": "Test Sender"
+        }
+        
+        # Create manager
+        manager = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        
+        # Test authentication
+        assert manager.authenticate() is True
+        assert manager.is_authenticated is True
+        
+        # Test token operations
+        token = manager.get_access_token()
+        assert token == "mock_mailersend_token"
+        assert manager.is_token_valid(token) is True
+        
+        # Test email sending
+        success = manager.send_email(
+            recipient_email="recipient@example.com",
+            subject="Test Subject",
+            body="Test Body",
+            sender_email="sender@example.com",
+            sender_name="Test Sender"
+        )
+        assert success is True
+
+    def test_factory_singleton_behavior(self):
+        """Test that factory maintains provider registrations."""
+        # Register provider
         self.factory.register_provider(
-            AuthenticationProvider.GMAIL_APP_PASSWORD, MockAuthenticationManager
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
         )
+        
+        # Create multiple managers
+        config = {"mailersend_api_token": "test_token"}
+        manager1 = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        manager2 = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        
+        # Both should be instances of the same class
+        assert type(manager1) == type(manager2)
+        assert isinstance(manager1, MockMailerSendManager)
+        assert isinstance(manager2, MockMailerSendManager)
 
-    def test_full_workflow_microsoft(self):
-        """Test complete workflow with Microsoft OAuth."""
+    def test_get_available_providers(self):
+        """Test getting list of available providers."""
+        # Create a fresh factory instance to avoid interference from setup_method
+        fresh_factory = AuthenticationFactory()
+        
+        # Initially empty
+        assert fresh_factory.get_available_providers() == []
+        
+        # After registration
+        fresh_factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        providers = fresh_factory.get_available_providers()
+        assert AuthenticationProvider.MAILERSEND in providers
+        assert len(providers) == 1
+
+    def test_auto_detect_provider_success(self):
+        """Test successful auto-detection of provider."""
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
         config = {
-            "tenant_id": "test-tenant",
-            "client_id": "test-client",
-            "client_secret": "test-secret",
+            "mailersend_api_token": "test_token",
+            "sender_email": "test@example.com"
         }
+        
+        # Should auto-detect MailerSend
+        manager = self.factory.create_manager(config=config, auto_detect=True)
+        assert isinstance(manager, MockMailerSendManager)
 
-        # Auto-detect should work
-        manager = self.factory.create_manager(config=config)
-        assert manager.provider == AuthenticationProvider.MICROSOFT_OAUTH
+    def test_auto_detect_provider_failure(self):
+        """Test auto-detection failure when no suitable provider found."""
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        config = {"unknown_key": "value"}
+        
+        with pytest.raises(AuthenticationError, match="No suitable authentication provider found"):
+            self.factory.create_manager(config=config, auto_detect=True)
 
-        # Should be able to authenticate
-        assert manager.authenticate() is True
-
-        # Should be able to get token
-        token = manager.get_access_token()
-        assert token == "mock_token"
-
-    def test_full_workflow_gmail(self):
-        """Test complete workflow with Gmail App Password."""
-        config = {
-            "gmail_app_password": "test-password",
-            "gmail_sender_email": "test@gmail.com",
-        }
-
-        # Auto-detect should work
-        manager = self.factory.create_manager(config=config)
-        assert manager.provider == AuthenticationProvider.GMAIL_APP_PASSWORD
-
-        # Should be able to authenticate
-        assert manager.authenticate() is True
-
-        # Should be able to get token
-        token = manager.get_access_token()
-        assert token == "mock_token"
-
-    def test_fallback_workflow(self):
-        """Test fallback workflow when primary provider fails."""
-        config = {"gmail_app_password": "test", "gmail_sender_email": "test@gmail.com"}
-
-        # Create manager that fails validation for Microsoft
-        class FailingMicrosoftManager(MockAuthenticationManager):
-            def validate_configuration(self):
-                return self.provider != AuthenticationProvider.MICROSOFT_OAUTH
-
-        # Replace Microsoft manager with failing one
-        self.factory._providers[
-            AuthenticationProvider.MICROSOFT_OAUTH
-        ] = FailingMicrosoftManager
-
-        # Should fallback to Gmail
+    def test_create_with_fallback_success_primary(self):
+        """Test fallback mechanism when primary provider succeeds."""
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        config = {"mailersend_api_token": "test_token"}
+        
         manager = self.factory.create_with_fallback(
-            AuthenticationProvider.MICROSOFT_OAUTH,
-            [AuthenticationProvider.GMAIL_APP_PASSWORD],
-            config,
+            primary_provider=AuthenticationProvider.MAILERSEND,
+            fallback_providers=[],
+            config=config
         )
+        
+        assert isinstance(manager, MockMailerSendManager)
 
-        assert manager.provider == AuthenticationProvider.GMAIL_APP_PASSWORD
+    def test_create_with_fallback_all_fail(self):
+        """Test fallback mechanism when all providers fail."""
+        # Mock a manager that always fails validation
+        class FailingManager(MockMailerSendManager):
+            def validate_configuration(self) -> bool:
+                return False
+        
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, FailingManager
+        )
+        
+        config = {"invalid": "config"}
+        
+        with pytest.raises(AuthenticationError, match="All authentication providers failed"):
+            self.factory.create_with_fallback(
+                primary_provider=AuthenticationProvider.MAILERSEND,
+                fallback_providers=[],
+                config=config
+            )
+
+    def test_detect_provider_mailersend(self):
+        """Test detection of MailerSend provider."""
+        config = {"mailersend_api_token": "test_token"}
+        detected = self.factory._detect_provider(config)
+        assert detected == AuthenticationProvider.MAILERSEND
+
+    def test_detect_provider_none(self):
+        """Test detection returns None for unknown config."""
+        config = {"unknown_key": "value"}
+        detected = self.factory._detect_provider(config)
+        assert detected is None
+
+    def test_validate_provider_config_success(self):
+        """Test successful provider configuration validation."""
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        config = {"mailersend_api_token": "test_token"}
+        
+        is_valid = self.factory.validate_provider_config(
+            AuthenticationProvider.MAILERSEND, config
+        )
+        assert is_valid is True
+
+    def test_validate_provider_config_unregistered(self):
+        """Test validation with unregistered provider."""
+        # Create a fresh factory instance without any registered providers
+        fresh_factory = AuthenticationFactory()
+        
+        config = {"mailersend_api_token": "test_token"}
+        
+        is_valid = fresh_factory.validate_provider_config(
+            AuthenticationProvider.MAILERSEND, config
+        )
+        assert is_valid is False
+
+    def test_validate_provider_config_invalid(self):
+        """Test validation with invalid configuration."""
+        # Mock a manager that fails validation
+        class InvalidConfigManager(MockMailerSendManager):
+            def validate_configuration(self) -> bool:
+                return False
+        
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, InvalidConfigManager
+        )
+        
+        config = {"invalid": "config"}
+        
+        is_valid = self.factory.validate_provider_config(
+            AuthenticationProvider.MAILERSEND, config
+        )
+        assert is_valid is False
+
+    def test_validate_provider_config_exception(self):
+        """Test validation when exception occurs during validation."""
+        # Mock a manager that raises exception during instantiation
+        class ExceptionManager(MockMailerSendManager):
+            def __init__(self, settings):
+                raise ValueError("Test exception")
+        
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, ExceptionManager
+        )
+        
+        config = {"mailersend_api_token": "test_token"}
+        
+        is_valid = self.factory.validate_provider_config(
+            AuthenticationProvider.MAILERSEND, config
+        )
+        assert is_valid is False
+
+    def test_factory_with_settings(self):
+        """Test factory initialization with settings."""
+        from types import SimpleNamespace
+        settings = SimpleNamespace(test_setting="value")
+        factory = AuthenticationFactory(settings)
+        assert factory._settings == settings
+
+    def test_create_manager_no_config(self):
+        """Test creating manager without config parameter."""
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        manager = self.factory.create_manager(AuthenticationProvider.MAILERSEND)
+        assert isinstance(manager, MockMailerSendManager)
+
+    def test_create_manager_auto_detect_disabled(self):
+        """Test creating manager with auto_detect disabled."""
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        config = {"mailersend_api_token": "test_token"}
+        
+        with pytest.raises(AuthenticationError, match="No suitable authentication provider found"):
+            self.factory.create_manager(config=config, auto_detect=False)

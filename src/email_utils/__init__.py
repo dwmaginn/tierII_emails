@@ -1,5 +1,5 @@
-"""Email utilities package for SMTP and email functionality."""
+"""Email utilities package."""
 
-from .smtp_client import SMTPClient
+# No utilities currently available
 
-__all__ = ['SMTPClient']
+__all__ = []
