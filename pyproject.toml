@@ -38,9 +38,5 @@ dev = [
 [project.scripts]
 tierII-email-campaign = "email_campaign:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["*"]
-
 [tool.setuptools.package-dir]
 "" = "src"

@@ -81,6 +81,35 @@ class EmailCampaign:
         return total_sent
 
 
+def handle_authentication_with_exit(auth_manager, context_message: str = "authentication", success_exit_code: int = None):
+    """
+    Handle authentication with proper error handling and exit codes.
+    
+    Args:
+        auth_manager: The authentication manager instance
+        context_message: Context message for logging (e.g., "authentication", "Testing MailerSend authentication")
+        success_exit_code: If provided, exit with this code on success (for test scenarios)
+    """
+    print(f"{context_message}...")
+    try:
+        auth_manager.authenticate()
+        if success_exit_code is not None:
+            print("✓ Authentication successful! MailerSend API key is valid.")
+            print(f"✓ Sender email configured: {settings.sender_email}")
+            sys.exit(success_exit_code)
+        else:
+            print("✓ Authentication successful!")
+    except AuthenticationError as e:
+        print(f"✗ Authentication failed: {e}")
+        sys.exit(1)
+    except NetworkError as e:
+        print(f"✗ Network error during authentication: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"✗ Unexpected error during authentication: {e}")
+        sys.exit(1)
+
+
 def create_authentication_manager():
     """Create and configure the MailerSend authentication manager."""
     try:
@@ -314,21 +343,7 @@ def main():
     
     # Handle authentication testing
     if args.test_auth:
-        print("Testing MailerSend authentication...")
-        try:
-            auth_manager.authenticate()
-            print("✓ Authentication successful! MailerSend API key is valid.")
-            print(f"✓ Sender email configured: {settings.sender_email}")
-            sys.exit(0)
-        except AuthenticationError as e:
-            print(f"✗ Authentication failed: {e}")
-            sys.exit(1)
-        except NetworkError as e:
-            print(f"✗ Network error during authentication: {e}")
-            sys.exit(1)
-        except Exception as e:
-            print(f"✗ Unexpected error during authentication: {e}")
-            sys.exit(1)
+        handle_authentication_with_exit(auth_manager, "Testing MailerSend authentication", 0)
     
     # Determine which CSV file to use
     if args.test_csv:
@@ -374,19 +389,7 @@ def main():
         print("\nDry-run mode: Skipping user confirmation, proceeding to test email only.")
 
     # Authenticate with MailerSend before sending emails
-    print("\nAuthenticating with MailerSend...")
-    try:
-        auth_manager.authenticate()
-        print("✓ Authentication successful!")
-    except AuthenticationError as e:
-        print(f"✗ Authentication failed: {e}")
-        return
-    except NetworkError as e:
-        print(f"✗ Network error during authentication: {e}")
-        return
-    except Exception as e:
-        print(f"✗ Unexpected error during authentication: {e}")
-        return
+    handle_authentication_with_exit(auth_manager, "Authenticating with MailerSend")
 
     # Send test email if test recipient is configured
     if settings.test_recipient_email:
