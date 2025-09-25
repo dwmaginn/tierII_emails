@@ -63,9 +63,9 @@ class TestEmailCampaignMailerSendIntegration:
             assert result is True
             mock_mailersend_manager.send_email.assert_called_once()
             call_args = mock_mailersend_manager.send_email.call_args
-            assert call_args[1]['recipient_email'] == "test@example.com"
-            assert call_args[1]['sender_email'] == "test@example.com"
-            assert call_args[1]['sender_name'] == "Test Sender"
+            assert call_args[1]['to_email'] == "test@example.com"
+            assert 'subject' in call_args[1]
+            assert 'html_content' in call_args[1]
 
     @pytest.mark.skipif(send_email is None, reason="email_campaign module not available")
     def test_send_email_authentication_error(self, mock_mailersend_manager, mock_settings):
@@ -148,7 +148,7 @@ class TestEmailCampaignMailerSendIntegration:
             
             assert result is True
             call_args = mock_mailersend_manager.send_email.call_args
-            body = call_args[1]['body']
+            body = call_args[1]['html_content']
             assert "Hi Alice," in body
 
     @pytest.mark.skipif(send_email is None, reason="email_campaign module not available")
@@ -161,7 +161,7 @@ class TestEmailCampaignMailerSendIntegration:
             
             assert result is True
             call_args = mock_mailersend_manager.send_email.call_args
-            body = call_args[1]['body']
+            body = call_args[1]['html_content']
             assert "Hi Friend," in body  # Uses fallback name
 
     def test_get_first_name_extraction(self):

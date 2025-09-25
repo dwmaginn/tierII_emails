@@ -1,6 +1,7 @@
 import csv
 import time
 import sys
+import os
 from datetime import datetime
 from typing import Optional
 import logging
@@ -127,6 +128,62 @@ def get_first_name(contact_name):
     return settings.test_fallback_first_name
 
 
+def load_email_template(first_name: str) -> str:
+    """Load and personalize email template from external file.
+    
+    Args:
+        first_name: First name to personalize the email
+        
+    Returns:
+        Personalized HTML email content
+    """
+    try:
+        # Check if custom template path is configured
+        template_path = None
+        try:
+            template_path = getattr(settings, 'email_template_path', None)
+            # Validate that template_path is a string (not a Mock object)
+            if template_path and not isinstance(template_path, str):
+                template_path = None
+        except (AttributeError, TypeError):
+            template_path = None
+        
+        if template_path and os.path.exists(template_path):
+            template_file = template_path
+        else:
+            # Use default template
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(current_dir)
+            template_file = os.path.join(project_root, 'templates', 'email_template.html')
+        
+        if not os.path.exists(template_file):
+            raise FileNotFoundError(f"Email template not found: {template_file}")
+        
+        with open(template_file, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+        
+        # Personalize the template
+        personalized_content = template_content.replace('{first_name}', first_name)
+        
+        return personalized_content
+        
+    except Exception as e:
+        print(f"Warning: Could not load email template: {e}")
+        # Fallback to simple text template
+        return f"""Hi {first_name},
+
+I hope this message finds you well. I wanted to reach out to you personally about an exciting opportunity that I believe could be of great interest to you.
+
+At Honest Pharmco, we specialize in providing high-quality cannabis products that meet the highest standards of purity, potency, and safety.
+
+Best regards,
+David Maginn
+Honest Pharmco
+Email: contact@honestpharmco.com
+Phone: (555) 123-4567
+"""
+
+
 def send_email(recipient_email, first_name, max_retries=3):
     """Send email to a single recipient using MailerSend API.
     
@@ -143,39 +200,8 @@ def send_email(recipient_email, first_name, max_retries=3):
     
     for attempt in range(max_retries):
         try:
-            # Email body with personalized first name
-            body = f"""Hi {processed_first_name},
-
-I hope this message finds you well. I wanted to reach out to you personally about an exciting opportunity that I believe could be of great interest to you.
-
-At Honest Pharmco, we specialize in providing high-quality cannabis products that meet the highest standards of purity, potency, and safety. Our products are carefully cultivated and rigorously tested to ensure that our customers receive only the best.
-
-Here's what sets us apart:
-
-🌿 **Premium Quality**: All our products undergo extensive lab testing for potency, pesticides, heavy metals, and microbials
-🌿 **Diverse Selection**: From flower to concentrates, edibles to topicals - we have something for every preference
-🌿 **Competitive Pricing**: Fair prices without compromising on quality
-🌿 **Discreet Delivery**: Fast, secure, and confidential shipping to your location
-🌿 **Expert Support**: Our knowledgeable team is here to help you find the perfect products for your needs
-
-Whether you're looking for products for medical relief, recreational enjoyment, or exploring cannabis for the first time, we're here to provide you with safe, reliable, and effective options.
-
-I'd love to discuss how Honest Pharmco can serve your cannabis needs. Please feel free to reach out to me directly, or visit our website to browse our current selection.
-
-Thank you for your time, and I look forward to the opportunity to serve you.
-
-Best regards,
-
-David Maginn
-Honest Pharmco
-Email: contact@honestpharmco.com
-Phone: (555) 123-4567
-
-P.S. As a new customer, mention this email for a special 15% discount on your first order!
-
----
-This email was sent to you because you expressed interest in cannabis products or services. If you no longer wish to receive these communications, please reply with "UNSUBSCRIBE" in the subject line.
-"""
+            # Load email template with personalized first name
+            body = load_email_template(processed_first_name)
 
             # Use MailerSend authentication manager to send email
             if auth_manager is None:
@@ -183,11 +209,10 @@ This email was sent to you because you expressed interest in cannabis products o
             
             # Send via MailerSend API
             success = auth_manager.send_email(
-                recipient_email=recipient_email,
+                to_email=recipient_email,
+                to_name=processed_first_name,
                 subject=SUBJECT,
-                body=body,
-                sender_email=settings.sender_email,
-                sender_name=settings.sender_name
+                html_content=body
             )
             
             if success:

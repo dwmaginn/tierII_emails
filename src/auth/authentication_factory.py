@@ -89,14 +89,12 @@ class AuthenticationFactory:
 
             manager_class = self._providers[provider]
             
-            # Handle MailerSend constructor signature
-            if provider == AuthenticationProvider.MAILERSEND:
-                # MailerSendManager expects settings object
-                from types import SimpleNamespace
-                settings = SimpleNamespace(**config)
-                manager = manager_class(settings)
-            else:
-                raise ValueError(f"Unsupported provider: {provider.value}")
+            # Create manager instance using standard configuration approach
+            manager = manager_class(provider)
+            
+            # Set configuration using the standard method
+            if config:
+                manager.set_configuration(config)
 
             if not manager.validate_configuration():
                 raise AuthenticationError(

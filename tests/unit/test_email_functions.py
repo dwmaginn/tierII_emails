@@ -118,10 +118,9 @@ class TestEmailFunctions:
             assert result is True
             mock_manager.send_email.assert_called_once()
             call_args = mock_manager.send_email.call_args
-            assert call_args[1]['recipient_email'] == "recipient@example.com"
-            assert call_args[1]['sender_email'] == "test@example.com"
-            assert call_args[1]['sender_name'] == "Test Sender"
-            assert "Hi John," in call_args[1]['body']
+            assert call_args[1]['to_email'] == "recipient@example.com"
+            assert 'html_content' in call_args[1]
+            assert "Hi John," in call_args[1]['html_content']
 
     @pytest.mark.email
     @pytest.mark.unit
@@ -221,13 +220,13 @@ class TestEmailFunctions:
             # Test with different first names
             send_email("recipient@example.com", "Alice")
             call_args = mock_manager.send_email.call_args
-            assert "Hi Alice," in call_args[1]['body']
+            assert "Hi Alice," in call_args[1]['html_content']
             
             mock_manager.reset_mock()
             
             send_email("recipient@example.com", "Bob")
             call_args = mock_manager.send_email.call_args
-            assert "Hi Bob," in call_args[1]['body']
+            assert "Hi Bob," in call_args[1]['html_content']
 
     @pytest.mark.email
     @pytest.mark.unit
@@ -265,7 +264,7 @@ class TestEmailFunctions:
             send_email("recipient@example.com", "John")
             
             call_args = mock_manager.send_email.call_args
-            body = call_args[1]['body']
+            body = call_args[1]['html_content']
             
             # Check for key content elements
             assert "Hi John," in body

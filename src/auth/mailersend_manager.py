@@ -29,36 +29,27 @@ class MailerSendManager(BaseAuthenticationManager):
     email sending functionality using the MailerSend service.
     """
 
-    def __init__(self, settings: Any):
-        """Initialize MailerSend manager with configuration settings.
+    def __init__(self, provider: AuthenticationProvider):
+        """Initialize MailerSend manager with provider type.
         
         Args:
-            settings: Configuration object containing MailerSend settings
+            provider: The authentication provider type
             
-        Raises:
-            InvalidCredentialsError: If API key is missing or invalid
+        Note:
+            Configuration must be set using set_configuration() after initialization.
         """
         # Initialize base class with provider type
-        super().__init__(AuthenticationProvider.MAILERSEND)
+        super().__init__(provider)
         
-        self.settings = settings
         self._logger = logging.getLogger(__name__)
         
         # Initialize last_authenticated attribute
         self.last_authenticated = None
         
-        # Validate API key
-        api_key = getattr(settings, 'mailersend_api_token', None)
-        if not api_key or not api_key.strip():
-            raise InvalidCredentialsError(
-                "MailerSend API key is required",
-                AuthenticationProvider.MAILERSEND,
-                "MISSING_API_KEY"
-            )
-        
-        self._api_key = api_key.strip()
+        # These will be set when configuration is provided
+        self._api_key = None
         self._client = None
-        self._initialize_client()
+        self.settings = None
 
     def _initialize_client(self) -> None:
         """Initialize the MailerSend client."""
@@ -123,17 +114,34 @@ class MailerSendManager(BaseAuthenticationManager):
             bool: True if configuration is valid, False otherwise
         """
         try:
-            # Check required settings
-            if not hasattr(self.settings, 'sender_email') or not self.settings.sender_email:
+            # Check if configuration has been set
+            config = self.get_configuration()
+            
+            # Check required API token
+            api_token = config.get('mailersend_api_token')
+            if not api_token or not api_token.strip():
+                self._logger.error("MailerSend API token is required")
+                return False
+            
+            # Check required sender email
+            sender_email = config.get('sender_email')
+            if not sender_email or not sender_email.strip():
                 self._logger.error("Sender email is required for MailerSend")
                 return False
             
             # Validate email format
-            if not self._is_valid_email(self.settings.sender_email):
-                self._logger.error(f"Invalid sender email format: {self.settings.sender_email}")
+            if not self._is_valid_email(sender_email):
+                self._logger.error(f"Invalid sender email format: {sender_email}")
                 return False
             
-            # API key already validated in __init__
+            # Initialize API key and client if validation passes
+            self._api_key = api_token.strip()
+            self._initialize_client()
+            
+            # Create settings object for backward compatibility
+            from types import SimpleNamespace
+            self.settings = SimpleNamespace(**config)
+            
             return True
             
         except Exception as e:
