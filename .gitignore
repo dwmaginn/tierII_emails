@@ -175,3 +175,6 @@ sensitive/
 
 venv/
 .ruff_cache/
+
+logs/
+data/

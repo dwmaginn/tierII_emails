@@ -87,19 +87,36 @@ def _parse_contact_row(row: Dict[str, str]) -> Optional[Dict[str, Any]]:
     
     full_address = ", ".join(address_parts) if address_parts else ""
     
-    # Create contact dictionary
+    # Create contact dictionary preserving all original CSV fields
     contact = {
-        "email": email,
+        # Original CSV fields (preserve exact column names)
+        "License Number": row.get("License Number", "").strip(),
+        "License Type": row.get("License Type", "").strip(),
+        "License Type Code": row.get("License Type Code", "").strip(),
+        "License Status": row.get("License Status", "").strip(),
+        "License Status Code": row.get("License Status Code", "").strip(),
+        "Issued Date": row.get("Issued Date", "").strip(),
+        "Effective Date": row.get("Effective Date", "").strip(),
+        "Expiration Date": row.get("Expiration Date", "").strip(),
+        "Application Number": row.get("Application Number", "").strip(),
+        "Entity Name": row.get("Entity Name", "").strip(),
+        "Address Line 1": row.get("Address Line 1", "").strip(),
+        "Address Line 2": row.get("Address Line 2", "").strip(),
+        "City": row.get("City", "").strip(),
+        "State": row.get("State", "").strip(),
+        "Zip Code": row.get("Zip Code", "").strip(),
+        "County": row.get("County", "").strip(),
+        "Region": row.get("Region", "").strip(),
+        "Business Website": row.get("Business Website", "").strip(),
+        "Operational Status": row.get("Operational Status", "").strip(),
+        "Business Purpose": row.get("Business Purpose", "").strip(),
+        "Tier Type": row.get("Tier Type", "").strip(),
+        "Processor Type": row.get("Processor Type", "").strip(),
+        "Primary Contact Name": row.get("Primary Contact Name", "").strip(),
+        "Email": row.get("Email", "").strip(),
+        
+        # Additional tracking fields for email processing
         "first_name": first_name,
-        "contact_name": contact_name,
-        "entity_name": row.get("Entity Name", "").strip(),
-        "license_number": row.get("License Number", "").strip(),
-        "business_website": row.get("Business Website", "").strip(),
-        "address": full_address,
-        "license_type": row.get("License Type", "").strip(),
-        "license_status": row.get("License Status", "").strip(),
-        "county": row.get("County", "").strip(),
-        "region": row.get("Region", "").strip(),
     }
     
     return contact
