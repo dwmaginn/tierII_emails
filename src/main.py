@@ -1,4 +1,4 @@
-from utils.csv_reader import parse_contacts_from_csv
+from src.utils.csv_reader import parse_contacts_from_csv
 import os
 import csv
 import json
@@ -7,8 +7,8 @@ import logging
 from datetime import datetime
 from mailersend import MailerSendClient, EmailBuilder
 from dotenv import load_dotenv
-from utils.json_reader import load_email_config
-from utils.report_generator import generate_email_summary_report
+from src.utils.json_reader import load_email_config
+from src.utils.report_generator import generate_email_summary_report
 from tqdm import tqdm
 from colorama import init, Fore, Back, Style
 
@@ -22,6 +22,8 @@ rate_config = json.load(open('rate_config.json'))
 BATCH_SIZE = rate_config['batch_size']
 COOLDOWN = rate_config['cooldown']
 INDIVIDUAL_COOLDOWN = rate_config['individual_cooldown']
+
+CONTACT_FILE = config['contacts']
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter to add colors to log levels."""
@@ -136,7 +138,7 @@ def log_successful_emails(contacts, failed_contacts):
     
 def send_in_bulk():
     ms = MailerSendClient(os.getenv('TIERII_MAILERSEND_API_TOKEN'))
-    contacts = parse_contacts_from_csv('data/test/testdata.csv')
+    contacts = parse_contacts_from_csv(CONTACT_FILE)
     successes = 0
     iterations = 0
     failures = []
@@ -192,7 +194,7 @@ def send_in_bulk():
     log_failed_emails(failures)
     log_successful_emails(contacts, failures)
     
-    success_rate = (successes / len(contacts)) * 100
+    success_rate = (successes / len(contacts)) * 100 if len(contacts) > 0 else 0
     logger.info(f"🎉 Batch emailing complete. Success rate: {success_rate:.2f}%")
     
     # Generate and display HTML summary report

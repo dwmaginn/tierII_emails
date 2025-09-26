@@ -144,7 +144,7 @@ def _extract_first_name(contact_name: str) -> str:
     first_name = name_parts[0]
     
     # Clean up common prefixes/titles
-    prefixes_to_remove = ["mr.", "mrs.", "ms.", "dr.", "prof."]
+    prefixes_to_remove = ["mr", "mrs", "ms", "dr", "prof"]
     first_name_lower = first_name.lower().rstrip(".")
     
     if first_name_lower in prefixes_to_remove and len(name_parts) > 1:
@@ -184,11 +184,12 @@ def validate_contacts(contacts: List[Dict[str, Any]]) -> List[str]:
     errors = []
     
     for i, contact in enumerate(contacts):
-        # Check required fields
-        if not contact.get("email"):
+        # Check required fields - handle both "email" and "Email" keys
+        email = contact.get("email") or contact.get("Email")
+        if not email:
             errors.append(f"Contact {i+1}: Missing email address")
-        elif not _is_valid_email(contact["email"]):
-            errors.append(f"Contact {i+1}: Invalid email format: {contact['email']}")
+        elif not _is_valid_email(email):
+            errors.append(f"Contact {i+1}: Invalid email format: {email}")
         
         if not contact.get("first_name") and not contact.get("contact_name"):
             errors.append(f"Contact {i+1}: Missing both first name and contact name")

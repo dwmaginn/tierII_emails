@@ -10,7 +10,8 @@ def generate_email_summary_report(
     failed_count: int,
     success_rate: float,
     failed_contacts: List[Dict[str, Any]] = None,
-    report_title: str = "Email Campaign Summary"
+    report_title: str = "Email Campaign Summary",
+    timestamp_override: str = None
 ) -> str:
     """
     Generate an HTML summary report for email campaign results and open it in browser.
@@ -18,6 +19,14 @@ def generate_email_summary_report(
     Args:
         total_contacts (int): Total number of contacts processed
         successful_count (int): Number of successful email sends
+        failed_count (int): Number of failed email sends
+        success_rate (float): Success rate as a percentage
+        failed_contacts (List[Dict[str, Any]]): List of failed contact details
+        report_title (str): Title for the report
+        timestamp_override (str): Override timestamp for testing purposes
+        
+    Returns:
+        str: Path to the generated HTML report file
         failed_count (int): Number of failed email sends
         success_rate (float): Success rate percentage
         failed_contacts (List[Dict]): List of failed contact details (optional)
@@ -383,7 +392,8 @@ def generate_email_summary_report(
     """
     
     # Write HTML to file
-    report_path = os.path.join('logs', f'email_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html')
+    timestamp_str = timestamp_override if timestamp_override else datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = os.path.join('logs', f'email_report_{timestamp_str}.html')
     
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
