@@ -144,7 +144,7 @@ def _extract_first_name(contact_name: str) -> str:
     first_name = name_parts[0]
     
     # Clean up common prefixes/titles
-    prefixes_to_remove = ["mr", "mrs", "ms", "dr", "prof"]
+    prefixes_to_remove = {"mr", "mrs", "ms", "dr", "prof", "rev", "sir", "madam"}
     first_name_lower = first_name.lower().rstrip(".")
     
     if first_name_lower in prefixes_to_remove and len(name_parts) > 1:
