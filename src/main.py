@@ -3,11 +3,13 @@ import os
 import csv
 import json
 import time
+import logging
 from datetime import datetime
 from mailersend import MailerSendClient, EmailBuilder
 from dotenv import load_dotenv
 from utils.json_reader import load_email_config
 from utils.report_generator import generate_email_summary_report
+from tqdm import tqdm
 
 load_dotenv()
 config = load_email_config()
@@ -16,6 +18,32 @@ rate_config = json.load(open('rate_config.json'))
 BATCH_SIZE = rate_config['batch_size']
 COOLDOWN = rate_config['cooldown']
 INDIVIDUAL_COOLDOWN = rate_config['individual_cooldown']
+
+def setup_logging():
+    """Set up structured logging with both console and file handlers."""
+    # Create logs directory if it doesn't exist
+    os.makedirs('logs', exist_ok=True)
+    
+    # Create timestamp for log file
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_filename = f'logs/email_campaign_{timestamp}.log'
+    
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_filename, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"📧 Email campaign logging initialized - Log file: {log_filename}")
+    return logger
+
+# Initialize logger
+logger = setup_logging()
 
 
 def log_failed_emails(failed_contacts):
@@ -38,7 +66,7 @@ def log_failed_emails(failed_contacts):
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(failed_contacts)
-    print(f"Failed emails logged to: {bounced_file_path}")
+    logger.info(f"❌ Failed emails logged to: {bounced_file_path}")
     
 def log_successful_emails(contacts, failed_contacts):
     """Log successful email attempts using set difference."""
@@ -68,7 +96,7 @@ def log_successful_emails(contacts, failed_contacts):
             log_entry['email_status'] = 'success'
             log_entry['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             writer.writerow(log_entry)
-    print(f"Successful emails logged to: {success_file_path}")
+    logger.info(f"✅ Successful emails logged to: {success_file_path}")
     
 def send_in_bulk():
     ms = MailerSendClient(os.getenv('TIERII_MAILERSEND_API_TOKEN'))
@@ -76,10 +104,14 @@ def send_in_bulk():
     successes = 0
     iterations = 0
     failures = []
-    for contact in contacts:
+    
+    logger.info(f"🚀 Starting email campaign for {len(contacts)} contacts")
+    
+    # Use tqdm for progress tracking
+    for contact in tqdm(contacts, desc="📧 Sending emails", unit="email"):
         try:
             #if iterations >= BATCH_SIZE:
-            #    print(f"Avoiding rate limiting with a {COOLDOWN} second cooldown...")
+            #    logger.info(f"⏸️ Avoiding rate limiting with a {COOLDOWN} second cooldown...")
             #    time.sleep(COOLDOWN)
             #    iterations = 0
             # Replace {name} placeholder with the contact's first name using string replacement
@@ -94,7 +126,7 @@ def send_in_bulk():
                 .build()
             response = ms.emails.send(email)
             if response.status_code == 202:
-                print(f"Email sent to {contact['Email']} successfully!")
+                logger.info(f"✅ Email sent to {contact['Email']} successfully!")
                 successes += 1
             else:
                 # Create a copy of the contact and add failure tracking fields
@@ -104,7 +136,7 @@ def send_in_bulk():
                 failure_entry['error_message'] = response.text
                 failure_entry['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 failures.append(failure_entry)
-                print(f"Failed to send email to {contact['Email']}: {response.status_code} - {response.text}")
+                logger.warning(f"⚠️ Failed to send email to {contact['Email']}: {response.status_code} - {response.text}")
             
             iterations += 1
         except Exception as e:
@@ -115,15 +147,17 @@ def send_in_bulk():
             failure_entry['error_message'] = str(e)
             failure_entry['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             failures.append(failure_entry)
-            print(f"Email to {contact['Email']} failed to send with the exception {e.__class__.__name__} - {e}. Sleeping for {INDIVIDUAL_COOLDOWN} seconds to avoid rate limiting...")
-        print(f"Sleeping for {INDIVIDUAL_COOLDOWN} seconds before next email to avoid rate limiting...")
+            logger.error(f"❌ Email to {contact['Email']} failed to send with the exception {e.__class__.__name__} - {e}. Sleeping for {INDIVIDUAL_COOLDOWN} seconds to avoid rate limiting...")
+        
+        # Update progress bar description with current status
+        tqdm.write(f"⏳ Sleeping for {INDIVIDUAL_COOLDOWN} seconds before next email to avoid rate limiting...")
         time.sleep(INDIVIDUAL_COOLDOWN) # current rate is 10 requests per minute, bump from 6 to 7 so we don't get any errors
     
     log_failed_emails(failures)
     log_successful_emails(contacts, failures)
     
     success_rate = (successes / len(contacts)) * 100
-    print(f"Batch emailing complete. Success rate: {success_rate:.2f}%")
+    logger.info(f"🎉 Batch emailing complete. Success rate: {success_rate:.2f}%")
     
     # Generate and display HTML summary report
     generate_email_summary_report(
