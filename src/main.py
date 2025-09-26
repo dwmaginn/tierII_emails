@@ -1,4 +1,4 @@
-from src.utils.csv_reader import parse_contacts_from_csv
+from .utils.csv_reader import parse_contacts_from_csv
 import os
 import csv
 import json
@@ -7,8 +7,8 @@ import logging
 from datetime import datetime
 from mailersend import MailerSendClient, EmailBuilder
 from dotenv import load_dotenv
-from src.utils.json_reader import load_email_config
-from src.utils.report_generator import generate_email_summary_report
+from .utils.json_reader import load_email_config
+from .utils.report_generator import generate_email_summary_report
 from tqdm import tqdm
 from colorama import init, Fore, Back, Style
 
@@ -207,5 +207,9 @@ def send_in_bulk():
         report_title="TierII Email Campaign Summary"
     )
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the email campaign tool."""
     send_in_bulk()
+
+if __name__ == "__main__":
+    main()

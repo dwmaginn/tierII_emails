@@ -9,19 +9,40 @@
    pip install -r requirements.txt
    ```
 
-2. **Environment Setup**
+2. **Install in Editable Mode (Recommended)**
+   ```bash
+   pip install -e .
+   ```
+   
+   This will:
+   - Install all dependencies automatically
+   - Create a command-line tool `email-campaign`
+   - Make the package importable from anywhere
+   - Allow changes to be reflected immediately without reinstalling
+
+3. **Environment Setup**
    - Copy `.env.example` to `.env`
    - Fill in required environment variables:
      - `TIERII_SENDER_EMAIL`: Your verified sender email address
      - `TIERII_MAILERSEND_API_TOKEN`: Your MailerSend API token
 
-3. **MailerSend Setup**
+4. **MailerSend Setup**
    - Create a MailerSend account at [mailersend.com](https://mailersend.com)
    - Generate an API token from the MailerSend dashboard
    - Verify your sender domain in MailerSend settings
    - Add your domain to the approved sender list
 
 4. **First Campaign**
+   
+   After installation, you can run the email campaign in two ways:
+
+   **Option 1: Using the Command-Line Tool (Recommended)**
+   If you installed with `pip install -e .`:
+   ```bash
+   email-campaign
+   ```
+
+   **Option 2: Direct Module Execution**
    ```bash
    python -m src.main
    ```

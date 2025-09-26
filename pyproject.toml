@@ -7,7 +7,7 @@ name = "tierII-emails"
 version = "0.1.0"
 description = "Email campaign management system using MailerSend API"
 authors = [
-    {name = "TierII Emails Team", email = "contact@honestpharmco.com"}
+    {name = "Luke Edwards", email = "luke@honestpharmco.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -36,7 +36,8 @@ dev = [
 ]
 
 [project.scripts]
-tierII-email-campaign = "src.email_campaign:main"
+email-campaign = "src.main:main"
 
-[tool.setuptools.package-dir]
-"" = "src"
+[tool.setuptools]
+packages = ["src", "src.utils"]
+

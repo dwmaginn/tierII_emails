@@ -1,4 +1,4 @@
-# TierII Email Campaign Tool
+# Email Campaign Tool
 
 A Python-based email campaign tool designed for bulk email sending using the MailerSend API. This tool provides personalized email campaigns with rate limiting, progress tracking, and comprehensive reporting.
 
@@ -75,14 +75,25 @@ This project is a robust email marketing solution that reads contact data from C
    pip install -r requirements.txt
    ```
 
-3. **Configure MailerSend API**
+3. **Install in editable mode (recommended)**
+   ```bash
+   pip install -e .
+   ```
+   
+   This will:
+   - Install all dependencies automatically
+   - Create a command-line tool `email-campaign`
+   - Make the package importable from anywhere
+   - Allow changes to be reflected immediately without reinstalling
+
+4. **Configure MailerSend API**
    
    Sign up for a MailerSend account at https://www.mailersend.com/
    - Create an API token in your MailerSend dashboard
    - Verify your sender domain
    - Note your API token for configuration
 
-4. **Configure environment variables**
+5. **Configure environment variables**
    
    Copy the example environment file and configure your credentials:
    ```bash
@@ -130,6 +141,16 @@ This project is a robust email marketing solution that reads contact data from C
    ```
 
 3. **Launch the email campaign**
+   
+   After installation, you can run the email campaign in two ways:
+
+   #### Option 1: Using the Command-Line Tool (Recommended)
+   If you installed with `pip install -e .`:
+   ```bash
+   email-campaign
+   ```
+
+   #### Option 2: Direct Module Execution
    ```bash
    python -m src.main
    ```
