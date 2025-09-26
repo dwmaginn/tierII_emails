@@ -20,18 +20,23 @@ This project contains a comprehensive email marketing solution for the cannabis 
 
 ```
 ├── src/                                # Source code directory
-├── tests/                              # Test suite
-├── data/                               # Contact data and test files
-├── email_campaign.py                   # Main email campaign script
-├── requirements.txt                    # Python dependencies
-└── README.md                          # This file
+│   ├── auth/                          # Authentication modules
+│   ├── config/                        # Configuration management
+│   ├── utils/                         # Utility functions
+│   └── email_campaign.py              # Main campaign script
+├── tests/                             # Test suite (unit & integration)
+├── data/contacts/                     # Contact CSV files
+├── templates/                         # Email templates
+├── scripts/                           # Helper scripts
+├── requirements.txt                   # Python dependencies
+└── README.md                         # This file
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.7 or higher
+- Python 3.8 or higher
 - MailerSend account with API access
 - Valid sender domain configured in MailerSend
 
@@ -39,8 +44,8 @@ This project contains a comprehensive email marketing solution for the cannabis 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/cannabis-email-campaign.git
-   cd cannabis-email-campaign
+   # Clone from your actual repository or download the project
+   cd tierII_emails
    ```
 
 2. **Install dependencies**
@@ -64,10 +69,16 @@ This project contains a comprehensive email marketing solution for the cannabis 
    
    Edit `.env` with your actual credentials:
    ```bash
-   # Required MailerSend credentials
-   TIERII_SENDER_EMAIL=your-email@domain.com
-   TIERII_MAILERSEND_API_TOKEN=your-api-token
-   TIERII_EMAIL_SUBJECT="Your Email Subject"
+   # Required MailerSend Configuration
+   TIERII_SENDER_EMAIL="your-verified-sender@yourdomain.com"
+   TIERII_MAILERSEND_API_TOKEN="your_mailersend_api_token_here"
+
+   # Optional Configuration (with defaults)
+   TIERII_EMAIL_TEMPLATE_PATH=templates/email_template.html  # Optional
+   TIERII_CAMPAIGN_BATCH_SIZE=50                             # Default: 50
+   TIERII_CAMPAIGN_DELAY_MINUTES=5                           # Default: 5 minutes
+   TIERII_TEST_FALLBACK_FIRST_NAME=Friend                    # Default: Friend
+   TIERII_TEST_CSV_FILENAME=data/contacts/tier_i_tier_ii_emails_verified.csv
    ```
    
    ⚠️ **SECURITY WARNING**: Never commit `.env` files to version control!
@@ -77,16 +88,22 @@ This project contains a comprehensive email marketing solution for the cannabis 
    python -m pytest tests/
    ```
 
+6. **Verify installation**
+   ```bash
+   # Verify installation
+   python -c "import src.email_campaign; print('Installation successful')"
+   ```
+
 ### Running the Campaign
 
 1. **Verify your contact data**
    ```bash
-   python test_csv_reader.py
+   python scripts/t_csv_reader.py
    ```
 
 2. **Launch the email campaign**
    ```bash
-   python email_campaign.py
+   python src/email_campaign.py
    ```
 
 The script will:
@@ -103,14 +120,17 @@ The script will:
 - `TIERII_SENDER_EMAIL`: Your verified sender email address
 - `TIERII_MAILERSEND_API_TOKEN`: Your MailerSend API token
 - `TIERII_SENDER_NAME`: Display name for email sender
-- `TIERII_CAMPAIGN_BATCH_SIZE`: Number of emails per batch (default: 10)
-- `TIERII_CAMPAIGN_DELAY_MINUTES`: Minutes to wait between batches (default: 3)
+- `TIERII_CAMPAIGN_BATCH_SIZE`: Number of emails per batch (default: 50)
+- `TIERII_CAMPAIGN_DELAY_MINUTES`: Minutes to wait between batches (default: 5)
+- `TIERII_EMAIL_TEMPLATE_PATH`: Path to email template (default: templates/email_template.html)
+- `TIERII_TEST_FALLBACK_FIRST_NAME`: Default first name for personalization (default: Friend)
+- `TIERII_TEST_CSV_FILENAME`: Path to CSV file (default: data/contacts/tier_i_tier_ii_emails_verified.csv)
 
 ## 📊 Data Source
 
 The project includes a verified CSV database (`tier_i_tier_ii_emails_verified.csv`) containing:
 
-- **120 verified contacts** from licensed NY cannabis businesses
+- **119 verified contacts** from licensed NY cannabis businesses
 - **License information**: License numbers, types, and status
 - **Business details**: Entity names, addresses, and operational status
 - **Contact information**: Primary contact names and email addresses
