@@ -10,6 +10,7 @@ config = load_email_config()
 def send_in_bulk():
     ms = MailerSendClient(os.getenv('TIERII_MAILERSEND_API_TOKEN'))
     contacts = parse_contacts_from_csv('data/test/testdata.csv')
+    successes = 0
     for contact in contacts:
         # Replace {name} placeholder with the contact's first name using string replacement
         html_content = config['html_content'].replace('{name}', contact['first_name']) if config['html_content'] else ""
@@ -22,7 +23,12 @@ def send_in_bulk():
             .text(config['body'].format(name=contact['first_name'])) \
             .build()
         response = ms.emails.send(email)
-        print(response)
+        if response.status_code == 202:
+            successes += 1
+        else:
+            print(f"Failed to send email to {contact['email']}: {response.status_code} - {response.text}")
+    success_rate = (successes / len(contacts)) * 100
+    print(f"Batch emailing complete. Success rate: {success_rate:.2f}%")
 
 if __name__ == "__main__":
     send_in_bulk()
