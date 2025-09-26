@@ -23,7 +23,7 @@
 
 4. **First Campaign**
    ```bash
-   python src/main.py
+   python -m src.main
    ```
    - The system will use the test data in `data/test/testdata.csv`
    - Check the console for progress updates
@@ -66,7 +66,7 @@ The TierII Email Campaign Tool provides:
    - Test with small batches first
 
 4. **Run Campaign**
-   - Execute `python src/main.py`
+   - Execute `python -m src.main`
    - Monitor progress in real-time
    - Do not interrupt the process during sending
 

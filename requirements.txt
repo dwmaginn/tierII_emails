@@ -15,6 +15,9 @@ mailersend>=2.0.0  # Official MailerSend Python SDK for transactional emails
 tqdm>=4.64.0  # Progress bars for long-running operations
 colorama>=0.4.4  # Cross-platform colored terminal output
 
+# Template engine for HTML report generation
+jinja2>=3.0.0  # Template engine for separating presentation from logic
+
 # Development dependencies (uncomment for development)
 # pytest>=7.0.0  # For unit testing
 # black>=22.0.0  # For code formatting
