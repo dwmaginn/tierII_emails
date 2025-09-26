@@ -24,9 +24,8 @@ from auth.base_authentication_manager import (
 class MockMailerSendManager(BaseAuthenticationManager):
     """Mock MailerSend authentication manager for testing."""
 
-    def __init__(self, settings):
-        super().__init__(AuthenticationProvider.MAILERSEND)
-        self.settings = settings
+    def __init__(self, provider):
+        super().__init__(provider)
         self._mock_valid_config = True
         self._mock_auth_success = True
 
@@ -167,7 +166,89 @@ class TestAuthenticationFactoryIntegration:
         )
         assert success is True
 
-    def test_factory_singleton_behavior(self):
+    def test_factory_caching_behavior(self):
+        """Test that factory uses caching to prevent redundant manager creation."""
+        from src.auth.authentication_cache import authentication_cache
+        
+        # Clear cache first
+        authentication_cache.invalidate_cache()
+        
+        config = {
+            "mailersend_api_token": "test_token",
+            "sender_email": "test@example.com",
+            "sender_name": "Test Sender"
+        }
+        
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        # Create first manager
+        manager1 = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        
+        # Create second manager with same config - should return cached instance
+        manager2 = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        
+        # Should be the same instance due to caching
+        assert manager1 is manager2
+        
+        # Clean up
+        authentication_cache.invalidate_cache()
+
+    def test_factory_cache_invalidation(self):
+        """Test that cache invalidation forces new manager creation."""
+        from src.auth.authentication_cache import authentication_cache
+        
+        # Clear cache first
+        authentication_cache.invalidate_cache()
+        
+        config = {
+            "mailersend_api_token": "test_token",
+            "sender_email": "test@example.com",
+            "sender_name": "Test Sender"
+        }
+        
+        self.factory.register_provider(
+            AuthenticationProvider.MAILERSEND, MockMailerSendManager
+        )
+        
+        # Create first manager
+        manager1 = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        print(f"Manager1 ID: {id(manager1)}")
+        print(f"Manager1 authenticated: {manager1.is_authenticated}")
+        
+        # Keep a strong reference to prevent garbage collection
+        managers_list = [manager1]
+        
+        # Check cache stats before invalidation
+        stats_before = authentication_cache.get_cache_stats()
+        print(f"Cache stats before invalidation: {stats_before}")
+        
+        # Verify manager is cached
+        cached_manager = authentication_cache.get_manager(AuthenticationProvider.MAILERSEND, config)
+        print(f"Cached manager ID: {id(cached_manager) if cached_manager else 'None'}")
+        
+        # Invalidate cache
+        authentication_cache.invalidate_cache(AuthenticationProvider.MAILERSEND)
+        
+        # Check cache stats after invalidation
+        stats_after = authentication_cache.get_cache_stats()
+        print(f"Cache stats after invalidation: {stats_after}")
+        
+        # Verify cache is empty
+        cached_manager_after = authentication_cache.get_manager(AuthenticationProvider.MAILERSEND, config)
+        print(f"Cached manager after invalidation: {id(cached_manager_after) if cached_manager_after else 'None'}")
+        
+        # Create second manager - should be new instance
+        manager2 = self.factory.create_manager(AuthenticationProvider.MAILERSEND, config)
+        print(f"Manager2 ID: {id(manager2)}")
+        print(f"Manager2 authenticated: {manager2.is_authenticated}")
+        
+        # Should be different instances
+        assert manager1 is not manager2
+        
+        # Clean up
+        authentication_cache.invalidate_cache()
         """Test that factory maintains provider registrations."""
         # Register provider
         self.factory.register_provider(

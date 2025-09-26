@@ -25,7 +25,7 @@ class TestMailerSendManager:
     def mock_settings(self):
         """Mock settings for MailerSend configuration."""
         settings = Mock()
-        settings.mailersend_api_token = "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
+        settings.mailersend_api_token = "super-secret-mailersend-token"
         settings.sender_email = "test@example.com"
         settings.sender_name = "Test Sender"
         return settings
@@ -37,7 +37,7 @@ class TestMailerSendManager:
         
         manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
         manager.set_configuration({
-            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',
+            'mailersend_api_token': 'super-secret-mailersend-token',
             'sender_email': 'test@example.com',
             'sender_name': 'Test Sender'
         })
@@ -52,7 +52,7 @@ class TestMailerSendManager:
         
         manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
         manager.set_configuration({
-            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',
+            'mailersend_api_token': 'super-secret-mailersend-token',
             'sender_email': 'test@example.com',
             'sender_name': 'Test Sender'
         })
@@ -60,7 +60,7 @@ class TestMailerSendManager:
         # Validate configuration to initialize the manager
         assert manager.validate_configuration() is True
         assert manager.provider == AuthenticationProvider.MAILERSEND
-        assert manager._api_key == "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
+        assert manager._api_key == "super-secret-mailersend-token"
         assert manager._client is not None
 
     def test_mailersend_manager_missing_api_key(self):
@@ -122,7 +122,7 @@ class TestMailerSendManager:
         
         manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
         manager.set_configuration({
-            'mailersend_api_token': 'mlsn.short',  # Invalid: too short
+            'mailersend_api_token': 'super-secret-short',  # Invalid: too short
             'sender_email': 'test@example.com',
             'sender_name': 'Test Sender'
         })
@@ -153,12 +153,12 @@ class TestMailerSendManager:
         assert exc_info.value.provider == AuthenticationProvider.MAILERSEND
 
     def test_authenticate_invalid_format_non_hex_characters(self):
-        """Test authentication failure with invalid API key format - non-hex characters."""
+        """Test authentication failure with invalid API key format - wrong prefix."""
         from src.auth.mailersend_manager import MailerSendManager
         
         manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
         manager.set_configuration({
-            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f606g',  # Invalid: 'g' is not hex
+            'mailersend_api_token': 'invalid-prefix-token',  # Invalid: wrong prefix
             'sender_email': 'test@example.com',
             'sender_name': 'Test Sender'
         })
@@ -189,7 +189,7 @@ class TestMailerSendManager:
         manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
         
         # Test valid format
-        valid_key = "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
+        valid_key = "super-secret-mailersend-token"
         assert manager._validate_mailersend_api_key_format(valid_key) is True
 
     def test_validate_mailersend_api_key_format_invalid_cases(self):
@@ -201,12 +201,12 @@ class TestMailerSendManager:
         # Test invalid cases
         invalid_keys = [
             "",  # Empty
-            "mlsn.",  # No hex part
-            "wrong.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061",  # Wrong prefix
-            "mlsn.short",  # Too short
-            "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f606g",  # Non-hex character
-            "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f60611",  # Too long (65 chars)
-            "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f606",  # Too short (63 chars)
+            "invalid-prefix-token",  # Wrong prefix
+            "super-secret-wrong-prefix",  # Wrong prefix
+            "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061",  # Old format
+            "super-secret",  # Too short
+            None,  # None value
+            123,  # Non-string
         ]
         
         for invalid_key in invalid_keys:
@@ -413,12 +413,12 @@ class TestMailerSendManagerIntegration:
         factory.register_provider(AuthenticationProvider.MAILERSEND, MailerSendManager)
         
         mock_settings = Mock()
-        mock_settings.mailersend_api_token = "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061"
+        mock_settings.mailersend_api_token = "super-secret-mailersend-token"
         mock_settings.sender_email = "test@example.com"
         
         # Fix: Pass settings as config parameter, not as second argument
         config = {
-            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',
+            'mailersend_api_token': 'super-secret-mailersend-token',
             'sender_email': 'test@example.com'
         }
         
@@ -427,14 +427,99 @@ class TestMailerSendManagerIntegration:
         assert isinstance(manager, MailerSendManager)
         assert manager.provider == AuthenticationProvider.MAILERSEND
 
-    def test_performance_requirements(self):
+    def test_client_singleton_pattern(self):
+        """Test that client singleton pattern prevents redundant client creation."""
+        from src.auth.mailersend_manager import MailerSendManager
+        
+        config = {
+            'mailersend_api_token': "super-secret-mailersend-token",
+            'sender_email': "test@example.com",
+            'sender_name': "Test Sender"
+        }
+        
+        # Create two managers with same config
+        manager1 = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        manager1.set_configuration(config)
+        manager1.validate_configuration()
+        
+        manager2 = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        manager2.set_configuration(config)
+        manager2.validate_configuration()
+        
+        # Initialize clients
+        manager1._initialize_client()
+        manager2._initialize_client()
+        
+        # Should reuse the same client instance
+        assert manager1._client is manager2._client
+        
+        # Clean up cache for other tests
+        MailerSendManager.clear_client_cache()
+
+    def test_client_cache_stats(self):
+        """Test client cache statistics reporting."""
+        from src.auth.mailersend_manager import MailerSendManager
+        
+        # Clear cache first
+        MailerSendManager.clear_client_cache()
+        
+        config = {
+            'mailersend_api_token': "super-secret-mailersend-token",
+            'sender_email': "test@example.com",
+            'sender_name': "Test Sender"
+        }
+        
+        # Initially empty
+        stats = MailerSendManager.get_cache_stats()
+        assert stats['cached_clients'] == 0
+        
+        # Create and initialize client
+        manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        manager.set_configuration(config)
+        manager.validate_configuration()
+        manager._initialize_client()
+        
+        # Should have one cached client
+        stats = MailerSendManager.get_cache_stats()
+        assert stats['cached_clients'] == 1
+        assert len(stats['cache_keys']) == 1
+        
+        # Clean up
+        MailerSendManager.clear_client_cache()
+
+    def test_client_cache_clear(self):
+        """Test clearing client cache."""
+        from src.auth.mailersend_manager import MailerSendManager
+        
+        config = {
+            'mailersend_api_token': "super-secret-mailersend-token",
+            'sender_email': "test@example.com",
+            'sender_name': "Test Sender"
+        }
+        
+        # Create and initialize client
+        manager = MailerSendManager(AuthenticationProvider.MAILERSEND)
+        manager.set_configuration(config)
+        manager.validate_configuration()
+        manager._initialize_client()
+        
+        # Should have cached client
+        stats = MailerSendManager.get_cache_stats()
+        assert stats['cached_clients'] > 0
+        
+        # Clear cache
+        MailerSendManager.clear_client_cache()
+        
+        # Should be empty
+        stats = MailerSendManager.get_cache_stats()
+        assert stats['cached_clients'] == 0
         """Test that MailerSend operations meet performance requirements."""
         import time
         from src.auth.mailersend_manager import MailerSendManager
         
         # Use proper configuration dictionary instead of Mock
         config = {
-            'mailersend_api_token': "mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061",
+            'mailersend_api_token': "super-secret-mailersend-token",
             'sender_email': "test@example.com",
             'sender_name': "Test Sender"
         }

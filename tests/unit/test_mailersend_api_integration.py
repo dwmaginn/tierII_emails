@@ -26,7 +26,7 @@ class TestMailerSendAPIIntegration:
     def valid_config(self):
         """Valid configuration for MailerSend."""
         return {
-            'mailersend_api_token': 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061',
+            'mailersend_api_token': 'super-secret-mailersend-token',
             'sender_email': 'test@example.com',
             'sender_name': 'Test Sender'
         }
@@ -60,7 +60,7 @@ class TestMailerSendAPIIntegration:
         """Test successful API authentication with realistic response."""
         # Since we're using a test token, authentication will fail with real API
         # Test that the manager is properly configured instead
-        assert mailersend_manager._api_key == 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061'
+        assert mailersend_manager._api_key == 'super-secret-mailersend-token'
         assert mailersend_manager._client is not None
         assert mailersend_manager.get_provider_name() == "MailerSend"
 
@@ -277,7 +277,7 @@ class TestMailerSendAPIIntegration:
     def test_api_request_headers_and_authentication(self, mailersend_manager):
         """Test that API requests include proper headers and authentication."""
         # Test that client initialization works with API key
-        assert mailersend_manager._api_key == 'mlsn.4fc7f2db28d321fd0e0541508cf0136827e36f9fe355ad8b5b005208c83f6061'
+        assert mailersend_manager._api_key == 'super-secret-mailersend-token'
         assert mailersend_manager._client is not None
 
     def test_api_response_status_code_mapping(self, mailersend_manager):

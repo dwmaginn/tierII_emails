@@ -8,8 +8,9 @@ with other authentication providers.
 import re
 import logging
 import urllib3
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, ClassVar
 from datetime import datetime
+import threading
 
 from mailersend import MailerSendClient, EmailBuilder
 from mailersend.exceptions import MailerSendError, AuthenticationError as MailerSendAuthError
@@ -28,7 +29,12 @@ class MailerSendManager(BaseAuthenticationManager):
     
     This class handles authentication with MailerSend API and provides
     email sending functionality using the MailerSend service.
+    Implements singleton pattern for client instances to minimize API calls.
     """
+
+    # Class-level client cache for singleton pattern
+    _client_cache: ClassVar[Dict[str, MailerSendClient]] = {}
+    _cache_lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(self, provider: AuthenticationProvider):
         """Initialize MailerSend manager with provider type.
@@ -47,19 +53,47 @@ class MailerSendManager(BaseAuthenticationManager):
         # Initialize last_authenticated attribute
         self.last_authenticated = None
         
-        # These will be set when configuration is provided
-        self._api_key = None
+        # Client will be initialized lazily
         self._client = None
+        self._api_key = None
         self.settings = None
 
+    def _get_client_cache_key(self) -> str:
+        """Generate cache key for client singleton pattern.
+        
+        Returns:
+            str: Cache key based on API key hash
+        """
+        if not self._api_key:
+            return ""
+        # Use first 16 chars of API key as cache key for security
+        return f"mailersend_{self._api_key[:16]}"
+
     def _initialize_client(self) -> None:
-        """Initialize the MailerSend client."""
+        """Initialize the MailerSend client using singleton pattern."""
+        if not self._api_key:
+            raise InvalidCredentialsError(
+                "API key not configured",
+                AuthenticationProvider.MAILERSEND,
+                "NO_API_KEY"
+            )
+            
+        cache_key = self._get_client_cache_key()
+        
+        # Check if client already exists in cache
+        with self._cache_lock:
+            if cache_key in self._client_cache:
+                self._client = self._client_cache[cache_key]
+                self._logger.debug(f"Reusing cached MailerSend client for key: {cache_key[:8]}...")
+                return
+        
         try:
-            self._client = MailerSendClient(api_key=self._api_key)
+            # Create new client
+            client = MailerSendClient(api_key=self._api_key)
             
             # Disable urllib3 automatic retries to prevent interference with our retry logic
-            if hasattr(self._client, 'session') and self._client.session:
-                session = self._client.session
+            if hasattr(client, 'session') and client.session:
+                session = client.session
                 for adapter in session.adapters.values():
                     if hasattr(adapter, 'max_retries'):
                         # Disable all automatic retries
@@ -71,7 +105,12 @@ class MailerSendManager(BaseAuthenticationManager):
                         )
                         adapter.max_retries.respect_retry_after_header = False
             
-            self._logger.debug("MailerSend client initialized successfully with disabled urllib3 retries")
+            # Cache the client and assign to instance
+            with self._cache_lock:
+                self._client_cache[cache_key] = client
+                self._client = client
+            
+            self._logger.debug(f"MailerSend client initialized and cached successfully for key: {cache_key[:8]}...")
         except Exception as e:
             self._logger.error(f"Failed to initialize MailerSend client: {e}")
             raise InvalidCredentialsError(
@@ -124,7 +163,7 @@ class MailerSendManager(BaseAuthenticationManager):
     def _validate_mailersend_api_key_format(self, api_key: str) -> bool:
         """Validate MailerSend API key format without making API calls.
         
-        MailerSend API keys follow the pattern: mlsn. followed by 64 hexadecimal characters
+        MailerSend API keys follow the pattern: super-secret-mailersend-token followed by optional characters
         
         Args:
             api_key: The API key to validate
@@ -135,8 +174,8 @@ class MailerSendManager(BaseAuthenticationManager):
         if not api_key or not isinstance(api_key, str):
             return False
         
-        # MailerSend API key pattern: mlsn. + 64 hex characters
-        pattern = r'^mlsn\.[a-f0-9]{64}$'
+        # MailerSend API key pattern: super-secret-mailersend-token + optional characters
+        pattern = r'^super-secret-mailersend.*'
         return bool(re.match(pattern, api_key))
 
 
@@ -159,7 +198,7 @@ class MailerSendManager(BaseAuthenticationManager):
             
             # Validate API key format
             if not self._validate_mailersend_api_key_format(api_token.strip()):
-                self._logger.error("Invalid MailerSend API key format. Expected format: mlsn. followed by 64 hexadecimal characters")
+                self._logger.error("Invalid MailerSend API key format. Expected format: super-secret-mailersend-token followed by optional characters")
                 return False
             
             # Check required sender email
@@ -179,6 +218,9 @@ class MailerSendManager(BaseAuthenticationManager):
             # Create settings object for backward compatibility
             from types import SimpleNamespace
             self.settings = SimpleNamespace(**config)
+            
+            # Initialize client after successful validation
+            self._initialize_client()
             
             return True
             
@@ -221,7 +263,7 @@ class MailerSendManager(BaseAuthenticationManager):
             # Validate API key format without making API calls
             if not self._validate_mailersend_api_key_format(self._api_key):
                 raise InvalidCredentialsError(
-                    "Invalid MailerSend API key format. Expected format: mlsn. followed by 64 hexadecimal characters",
+                    "Invalid MailerSend API key format. Expected format: super-secret-mailersend-token followed by optional characters",
                     AuthenticationProvider.MAILERSEND,
                     "INVALID_API_KEY_FORMAT"
                 )
@@ -320,7 +362,7 @@ class MailerSendManager(BaseAuthenticationManager):
             AuthenticationError: If sending fails due to API errors
         """
         try:
-            # Initialize client if not already done
+            # Initialize client if not already done (uses singleton pattern)
             if self._client is None:
                 self._initialize_client()
             
@@ -350,36 +392,27 @@ class MailerSendManager(BaseAuthenticationManager):
                         error_msg += f" - {error_data['message']}"
                 except:
                     pass
-                
-                raise AuthenticationError(
-                    error_msg,
-                    AuthenticationProvider.MAILERSEND,
-                    f"RATE_LIMIT_429"
-                )
+                self._logger.error(error_msg)
+                raise AuthenticationError(error_msg, self.provider, "RATE_LIMIT")
             else:
-                error_msg = f"Failed to send email: HTTP {response.status_code}"
+                error_msg = f"Email sending failed with status {response.status_code}"
                 try:
                     error_data = response.json()
                     if 'message' in error_data:
-                        error_msg += f" - {error_data['message']}"
+                        error_msg += f": {error_data['message']}"
                 except:
                     pass
+                self._logger.error(error_msg)
+                raise AuthenticationError(error_msg, self.provider, "SEND_FAILED")
                 
-                raise AuthenticationError(
-                    error_msg,
-                    AuthenticationProvider.MAILERSEND,
-                    f"SEND_ERROR_{response.status_code}"
-                )
-                
-        except AuthenticationError:
-            raise
+        except MailerSendError as e:
+            error_msg = f"MailerSend API error: {str(e)}"
+            self._logger.error(error_msg)
+            raise AuthenticationError(error_msg, self.provider, "API_ERROR")
         except Exception as e:
-            self._logger.error(f"Error sending email via MailerSend: {e}")
-            raise AuthenticationError(
-                f"Error sending email via MailerSend: {e}",
-                AuthenticationProvider.MAILERSEND,
-                "SEND_ERROR"
-            )
+            error_msg = f"Unexpected error sending email: {str(e)}"
+            self._logger.error(error_msg)
+            raise AuthenticationError(error_msg, self.provider, "UNKNOWN_ERROR")
 
     def _html_to_text(self, html_content: str) -> str:
         """Convert HTML content to plain text.
@@ -437,3 +470,26 @@ class MailerSendManager(BaseAuthenticationManager):
             "last_authenticated": self.last_authenticated,
             "api_key_configured": bool(self._api_key),
         }
+
+    @classmethod
+    def clear_client_cache(cls) -> None:
+        """Clear the client cache. Useful for testing or memory management.
+        
+        This method should be used sparingly in production as it will force
+        re-initialization of clients on next use.
+        """
+        with cls._cache_lock:
+            cls._client_cache.clear()
+            
+    @classmethod
+    def get_cache_stats(cls) -> Dict[str, Any]:
+        """Get statistics about the client cache.
+        
+        Returns:
+            Dict containing cache statistics
+        """
+        with cls._cache_lock:
+            return {
+                "cached_clients": len(cls._client_cache),
+                "cache_keys": list(cls._client_cache.keys())
+            }

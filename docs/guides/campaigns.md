@@ -814,7 +814,7 @@ def troubleshoot_authentication():
         print("❌ TIERII_MAILERSEND_API_TOKEN not set")
         return False
     
-    if not api_token.startswith('mlsn.'):
+    if not api_token.startswith('your-api-token'):
         print("❌ Invalid API token format")
         return False
     

@@ -66,56 +66,83 @@ class AuthenticationFactory:
         config: Optional[Dict[str, Any]] = None,
         auto_detect: bool = True,
     ) -> BaseAuthenticationManager:
-        """Create an authentication manager instance.
+        """Create authentication manager for specified provider.
 
         Args:
-            provider: Specific provider to use (optional)
-            config: Configuration dictionary (optional)
+            provider: Authentication provider to use (optional for auto-detection)
+            config: Configuration dictionary containing provider-specific settings
             auto_detect: Whether to auto-detect provider if not specified
 
         Returns:
-            Configured authentication manager instance
+            BaseAuthenticationManager: Configured authentication manager
 
         Raises:
-            AuthenticationError: If no suitable provider found or configuration invalid
-            ValueError: If specified provider is not registered
+            AuthenticationError: If provider creation fails or no provider found
         """
-        config = config or {}
+        if config is None:
+            config = {}
 
-        # If provider specified, use it directly
-        if provider:
-            if provider not in self._providers:
-                raise ValueError(f"Provider {provider.value} is not registered")
+        # Auto-detect provider if not specified
+        if provider is None and auto_detect:
+            provider = self._detect_provider(config)
+            if not provider:
+                raise AuthenticationError(
+                    "No suitable authentication provider found - only MailerSend is supported",
+                    AuthenticationProvider.MAILERSEND,  # Default for error reporting
+                )
 
+        if provider is None:
+            raise AuthenticationError(
+                "No suitable authentication provider found",
+                AuthenticationProvider.MAILERSEND,  # Default for error reporting
+            )
+
+        # Check cache first to avoid redundant manager creation
+        from .authentication_cache import authentication_cache
+        cached_manager = authentication_cache.get_manager(provider, config)
+        if cached_manager is not None:
+            self._logger.debug(f"Retrieved cached authentication manager for provider: {provider.value}")
+            return cached_manager
+
+        # Create new manager if not cached
+        if provider not in self._providers:
+            raise ValueError(
+                f"Provider {provider.value} is not registered"
+            )
+
+        try:
             manager_class = self._providers[provider]
-            
-            # Create manager instance using standard configuration approach
             manager = manager_class(provider)
-            
-            # Set configuration using the standard method
-            if config:
-                manager.set_configuration(config)
+            manager.set_configuration(config)
 
             if not manager.validate_configuration():
                 raise AuthenticationError(
                     f"Invalid configuration for provider {provider.value}", provider
                 )
 
-            self._logger.info(
-                f"Created authentication manager for provider: {provider.value}"
-            )
+            # Authenticate the manager
+            print(f"DEBUG: About to authenticate manager for provider {provider.value}")
+            auth_result = manager.authenticate()
+            print(f"DEBUG: Authentication result: {auth_result}")
+            if auth_result:
+                # Cache the authenticated manager
+                print(f"DEBUG: About to cache manager for provider {provider.value}")
+                authentication_cache.cache_manager(provider, config, manager)
+                self._logger.info(
+                    f"Created and cached authentication manager for provider: {provider.value}"
+                )
+            else:
+                self._logger.warning(
+                    f"Authentication failed for provider: {provider.value}"
+                )
+
             return manager
-
-        # Auto-detect provider based on configuration
-        if auto_detect:
-            detected_provider = self._detect_provider(config)
-            if detected_provider:
-                return self.create_manager(detected_provider, config, auto_detect=False)
-
-        raise AuthenticationError(
-            "No suitable authentication provider found - only MailerSend is supported",
-            AuthenticationProvider.MAILERSEND,  # Default for error reporting
-        )
+            
+        except Exception as e:
+            self._logger.error(f"Failed to create manager for provider {provider.value}: {e}")
+            raise AuthenticationError(
+                f"Invalid configuration for provider {provider.value}", provider
+            )
 
     def create_with_fallback(
         self,
