@@ -3,15 +3,15 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tierII-emails"
-version = "0.1.0"
+name = "HPC-email-campaign"
+version = "1.0.0"
 description = "Email campaign management system using MailerSend API"
 authors = [
     {name = "Luke Edwards", email = "luke@honestpharmco.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.8"
-classifiers = [
+classifiers = [`
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
