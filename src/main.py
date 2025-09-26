@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 from utils.json_reader import load_email_config
 from utils.report_generator import generate_email_summary_report
 from tqdm import tqdm
+from colorama import init, Fore, Back, Style
+
+# Initialize colorama for cross-platform colored output
+init(autoreset=True)
 
 load_dotenv()
 config = load_email_config()
@@ -18,6 +22,30 @@ rate_config = json.load(open('rate_config.json'))
 BATCH_SIZE = rate_config['batch_size']
 COOLDOWN = rate_config['cooldown']
 INDIVIDUAL_COOLDOWN = rate_config['individual_cooldown']
+
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter to add colors to log levels."""
+    
+    # Define colors for different log levels
+    COLORS = {
+        'DEBUG': Fore.CYAN,
+        'INFO': Fore.GREEN,
+        'WARNING': Fore.YELLOW,
+        'ERROR': Fore.RED,
+        'CRITICAL': Fore.MAGENTA + Style.BRIGHT
+    }
+    
+    def format(self, record):
+        # Get the original formatted message
+        log_message = super().format(record)
+        
+        # Add color based on log level
+        color = self.COLORS.get(record.levelname, '')
+        if color:
+            # Color the entire message
+            log_message = f"{color}{log_message}{Style.RESET_ALL}"
+        
+        return log_message
 
 def setup_logging():
     """Set up structured logging with both console and file handlers."""
@@ -28,23 +56,31 @@ def setup_logging():
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_filename = f'logs/email_campaign_{timestamp}.log'
     
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_filename, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
-    )
-    
+    # Create logger
     logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    
+    # Clear any existing handlers
+    logger.handlers.clear()
+    
+    # Create file handler (no colors for file output)
+    file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(file_formatter)
+    
+    # Create console handler with colors
+    console_handler = logging.StreamHandler()
+    console_formatter = ColoredFormatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(console_formatter)
+    
+    # Add handlers to logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
     logger.info(f"📧 Email campaign logging initialized - Log file: {log_filename}")
     return logger
 
-# Initialize logger
 logger = setup_logging()
-
 
 def log_failed_emails(failed_contacts):
     """Log failed email attempts to a CSV file."""

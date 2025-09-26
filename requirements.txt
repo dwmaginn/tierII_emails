@@ -13,6 +13,7 @@ mailersend>=2.0.0  # Official MailerSend Python SDK for transactional emails
 
 # Progress tracking and user interface
 tqdm>=4.64.0  # Progress bars for long-running operations
+colorama>=0.4.4  # Cross-platform colored terminal output
 
 # Development dependencies (uncomment for development)
 # pytest>=7.0.0  # For unit testing
