@@ -1,0 +1,5 @@
+{
+    "batch_size": 10,
+    "cooldown": 60,
+    "individual_cooldown": 7
+}

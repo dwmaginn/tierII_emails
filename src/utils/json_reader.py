@@ -19,7 +19,7 @@ def load_email_config() -> Dict[str, Any]:
     # Get the project root directory (go up from src/utils to project root)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(os.path.dirname(current_dir))
-    config_path = os.path.join(project_root, "data", "config", "email_config.json")
+    config_path = os.path.join(project_root, "email_config.json")  # ← Simplified path
     
     try:
         with open(config_path, 'r', encoding='utf-8') as file:

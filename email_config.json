@@ -1,6 +1,7 @@
 {
     "subject": "High-Quality Cannabis Available - Honest Pharmco",
     "body": "Hi {name},\n\n        This is David from Honest Pharmco. We have a variety of high-quality cannabis available in sativa, indica, and hybrid strains, all with high THC percentages, including:\n            - B&C's\n            - Smalls\n            - Premium Flower\n            \n        Our pricing starts at $600/lb for our lowest grade and increases from there based on quality.\n        \n        Please feel free to reach out with any questions to discuss availability.\n        \n        Best,\n        David",
-    "html": "data/html/email_template.html",
-    "attachments": []
+    "html": "templates/email_template.html",
+    "attachments": [],
+    "contacts": "data/test/testdata.csv"
 }

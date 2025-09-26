@@ -1,85 +1,96 @@
-# TierII Email Campaign Documentation
+# Documentation Index
 
-Welcome to the comprehensive documentation for the TierII Email Campaign system - a Python-based email marketing solution designed for the cannabis industry using MailerSend API.
+This directory contains comprehensive documentation for the TierII Email Campaign Tool.
 
-## 📚 Documentation Index
+## Documentation Structure
 
-### 🚀 Getting Started
-- **[Quick Start Guide](quick-start.md)** - Get up and running in 5 minutes
-- **[Installation & Setup](api/configuration.md)** - Complete setup instructions
-- **[MailerSend API Setup](api/mailersend.md)** - Domain verification and API configuration
+### 📚 User Documentation
+**File**: [`user-documentation.md`](./user-documentation.md)
 
-### 🏗️ Architecture & Development
-- **[System Architecture](architecture/overview.md)** - High-level system design and data flow
-- **[Authentication System](api/authentication.md)** - Factory pattern and provider extensibility
-- **[Development Guide](guides/development.md)** - Code standards, patterns, and best practices
-- **[Testing Guide](guides/testing.md)** - Running tests, coverage requirements, and adding new tests
+Complete guide for end users, including:
+- **Quick Start Guide**: Installation, setup, and first campaign
+- **User Manual**: Feature overview, campaign process, and monitoring
+- **Configuration Reference**: Detailed configuration options and environment variables
 
-### 📖 User Guides
-- **[Campaign Management](guides/campaigns.md)** - Creating and managing email campaigns
-- **[CSV Data Format](guides/csv-format.md)** - Contact data requirements and validation
-- **[Email Templates](guides/templates.md)** - Template system and variable substitution
-- **[Troubleshooting](guides/troubleshooting.md)** - Common issues and solutions
+### 🔧 Technical Documentation  
+**File**: [`technical-documentation.md`](./technical-documentation.md)
 
-### 🔧 Technical Reference
-- **[Configuration Reference](api/configuration.md)** - Complete environment variables guide
-- **[Extension Guide](architecture/extensibility.md)** - Adding new email providers
-- **[CSV Processing Pipeline](architecture/csv-processing.md)** - Data validation and processing
-- **[Batch Processing](architecture/batch-processing.md)** - Optimization and scaling strategies
+Comprehensive technical reference, including:
+- **API Documentation**: Function signatures, parameters, and error handling
+- **Architecture Documentation**: System overview, data flow, and module relationships
+- **Database Schema Documentation**: CSV structure, validation rules, and data processing
 
-### 🔒 Compliance & Security
-- **[Security Practices](compliance/security.md)** - API key management and secure practices
-- **[Email Compliance](compliance/email-compliance.md)** - CAN-SPAM, GDPR guidelines
-- **[Privacy Policy](compliance/privacy.md)** - Contact data handling and protection
-
-## 🎯 Quick Navigation
+## Quick Navigation
 
 ### For New Users
-1. Start with [Quick Start Guide](quick-start.md)
-2. Follow [MailerSend API Setup](api/mailersend.md)
-3. Read [Campaign Management](guides/campaigns.md)
+1. Start with [Quick Start Guide](./user-documentation.md#quick-start-guide)
+2. Review [Feature Overview](./user-documentation.md#feature-overview)
+3. Follow [Campaign Process](./user-documentation.md#campaign-process)
 
 ### For Developers
-1. Review [System Architecture](architecture/overview.md)
-2. Study [Authentication System](api/authentication.md)
-3. Follow [Development Guide](guides/development.md)
-4. Set up [Testing Environment](guides/testing.md)
+1. Review [System Overview](./technical-documentation.md#system-overview)
+2. Study [API Documentation](./technical-documentation.md#api-documentation)
+3. Understand [Data Flow](./technical-documentation.md#data-flow)
 
 ### For System Administrators
-1. Configure [Security Practices](compliance/security.md)
-2. Review [Configuration Reference](api/configuration.md)
-3. Implement [Batch Processing](architecture/batch-processing.md) optimization
+1. Check [Environment Variables](./user-documentation.md#environment-variables)
+2. Configure [Rate Limiting](./user-documentation.md#rate-limiting)
+3. Review [MailerSend Integration](./technical-documentation.md#mailersend-integration-architecture)
 
-## 📊 System Overview
+## Documentation Coverage
 
-The TierII Email Campaign system is built with:
+### User Documentation Sections
+- ✅ Installation steps with `pip install -r requirements.txt`
+- ✅ Environment setup with `.env.example` to `.env` process
+- ✅ MailerSend setup including account creation and domain verification
+- ✅ First campaign execution with test data verification
+- ✅ Feature overview covering bulk sending, personalization, and rate limiting
+- ✅ Campaign process from CSV preparation to result review
+- ✅ CSV requirements with required/optional fields and validation rules
+- ✅ Template guide with HTML structure and `{first_name}` placeholder usage
+- ✅ Rate limiting configuration and MailerSend limits
+- ✅ Monitoring with progress bars, logs, and error handling
+- ✅ Configuration reference for `email_config.json` and `rate_config.json`
+- ✅ Environment variables documentation
+- ✅ Template system with variable substitution and custom creation
 
-- **Python 3.8+** with modern async/await patterns
-- **MailerSend API** for reliable email delivery
-- **Pydantic Settings** for configuration validation
-- **Factory Pattern** for extensible authentication
-- **CSV Processing** with robust validation
-- **Batch Processing** with rate limiting
-- **Comprehensive Testing** with 80%+ coverage
+### Technical Documentation Sections
+- ✅ `parse_contacts_from_csv` API with parameters, returns, and error handling
+- ✅ `load_email_config` configuration loading and path resolution
+- ✅ `generate_email_summary_report` HTML report generation
+- ✅ MailerSend integration patterns with authentication and email building
+- ✅ Exception handling including ContactParseError and API errors
+- ✅ System overview with data flow from CSV to MailerSend API
+- ✅ Architecture documentation with module relationships
+- ✅ MailerSend integration with API endpoints and response handling
+- ✅ CSV structure documentation with all 24 columns from license data
+- ✅ Required fields (Email, Primary Contact Name) and optional metadata
+- ✅ Validation rules with email format and name extraction logic
+- ✅ Contact parsing with name splitting and data cleaning
 
-## 🔄 Documentation Updates
+## File Locations
 
-This documentation is maintained alongside the codebase. When contributing:
+```
+docs/
+├── README.md                    # This index file
+├── user-documentation.md        # Complete user guide
+└── technical-documentation.md   # Technical reference
+```
 
-1. Update relevant documentation for code changes
-2. Follow the established documentation structure
-3. Include practical examples and code snippets
-4. Test all documented procedures
-5. Update this index when adding new sections
+## Additional Resources
 
-## 📞 Support
+- **Project Root**: [`../README.md`](../README.md) - Project overview and setup
+- **Configuration Examples**: 
+  - [`../email_config.json`](../email_config.json) - Email campaign configuration
+  - [`../rate_config.json`](../rate_config.json) - Rate limiting settings
+  - [`../.env.example`](../.env.example) - Environment variable template
+- **Source Code**: [`../src/`](../src/) - Implementation details
+- **Templates**: [`../templates/`](../templates/) - Email template examples
+- **Test Data**: [`../data/test/`](../data/test/) - Sample CSV data
 
-- **Issues**: Report bugs and feature requests via GitHub Issues
-- **Development**: See [Contributing Guidelines](guides/development.md#contributing)
-- **Security**: Report security issues privately to the maintainers
+## Getting Help
 
----
-
-**Last Updated**: {current_date}  
-**Version**: 0.1.0  
-**Maintainers**: TierII Emails Team
+1. **Quick Issues**: Check the [User Manual](./user-documentation.md#user-manual)
+2. **Configuration Problems**: Review [Configuration Reference](./user-documentation.md#configuration-reference)
+3. **Technical Issues**: Consult [API Documentation](./technical-documentation.md#api-documentation)
+4. **Architecture Questions**: See [Architecture Documentation](./technical-documentation.md#architecture-documentation)
