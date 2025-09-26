@@ -1,14 +1,14 @@
 # Cannabis Industry Email Campaign Tool
 
-A Python-based email campaign tool designed for reaching out to licensed cannabis businesses in New York State. This tool uses OAuth 2.0 authentication with Microsoft 365 to send personalized emails to Tier I and Tier II cannabis license holders.
+A Python-based email campaign tool designed for reaching out to licensed cannabis businesses in New York State. This tool uses MailerSend API for reliable email delivery to Tier I and Tier II cannabis license holders.
 
 ## 🌿 Project Overview
 
-This project contains a comprehensive email marketing solution for the cannabis industry, specifically targeting licensed processors and microbusinesses in New York State. The tool reads from a verified CSV database of cannabis license holders and sends personalized outreach emails.
+This project contains a comprehensive email marketing solution for the cannabis industry, specifically targeting licensed processors and microbusinesses in New York State. The tool reads from a verified CSV database of cannabis license holders and sends personalized outreach emails using the MailerSend API.
 
 ## 📋 Features
 
-- **OAuth 2.0 Authentication**: Modern, secure authentication with Microsoft 365/Exchange Online
+- **MailerSend API Integration**: Modern, reliable email delivery service with high deliverability
 - **Personalized Emails**: Automatically extracts first names for personalized greetings
 - **Rate Limiting**: Built-in batch processing with configurable delays to respect email limits
 - **CSV Integration**: Reads contact data from verified cannabis license databases
@@ -19,31 +19,33 @@ This project contains a comprehensive email marketing solution for the cannabis 
 ## 📁 Project Structure
 
 ```
-├── config.py                           # Email and OAuth configuration
-├── email_campaign.py                   # Main email campaign script
-├── oauth_setup_guide.py               # Step-by-step OAuth setup guide
-├── tier_i_tier_ii_emails_verified.csv # Verified cannabis business contacts
-├── test_csv_reader.py                  # CSV data validation script
-├── test_email_settings.py             # Email configuration testing
-├── test_oauth_smtp.py                  # OAuth authentication testing
-├── requirements.txt                    # Python dependencies
-└── README.md                          # This file
+├── src/                                # Source code directory
+│   ├── auth/                          # Authentication modules
+│   ├── config/                        # Configuration management
+│   ├── utils/                         # Utility functions
+│   └── email_campaign.py              # Main campaign script
+├── tests/                             # Test suite (unit & integration)
+├── data/contacts/                     # Contact CSV files
+├── templates/                         # Email templates
+├── scripts/                           # Helper scripts
+├── requirements.txt                   # Python dependencies
+└── README.md                         # This file
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.7 or higher
-- Microsoft 365 business account
-- Azure AD application with SMTP permissions
+- Python 3.8 or higher
+- MailerSend account with API access
+- Valid sender domain configured in MailerSend
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/cannabis-email-campaign.git
-   cd cannabis-email-campaign
+   # Clone from your actual repository or download the project
+   cd tierII_emails
    ```
 
 2. **Install dependencies**
@@ -51,44 +53,57 @@ This project contains a comprehensive email marketing solution for the cannabis 
    pip install -r requirements.txt
    ```
 
-3. **Configure OAuth 2.0**
+3. **Configure MailerSend API**
    
-   Run the setup guide to configure Microsoft 365 OAuth:
-   ```bash
-   python oauth_setup_guide.py
-   ```
-   
-   Follow the detailed instructions to:
-   - Enable SMTP AUTH in Microsoft 365
-   - Register an Azure AD application
-   - Configure API permissions
-   - Generate client credentials
+   Sign up for a MailerSend account at https://www.mailersend.com/
+   - Create an API token in your MailerSend dashboard
+   - Verify your sender domain
+   - Note your API token for configuration
 
-4. **Update configuration**
+4. **Configure environment variables**
    
-   Edit `config.py` with your credentials:
-   ```python
-   SENDER_EMAIL = "your-email@domain.com"
-   TENANT_ID = "your-tenant-id"
-   CLIENT_ID = "your-client-id"
-   CLIENT_SECRET = "your-client-secret"
+   Copy the example environment file and configure your credentials:
+   ```bash
+   cp .env.example .env
    ```
+   
+   Edit `.env` with your actual credentials:
+   ```bash
+   # Required MailerSend Configuration
+   TIERII_SENDER_EMAIL="your-verified-sender@yourdomain.com"
+   TIERII_MAILERSEND_API_TOKEN="your_mailersend_api_token_here"
+
+   # Optional Configuration (with defaults)
+   TIERII_EMAIL_TEMPLATE_PATH=templates/email_template.html  # Optional
+   TIERII_CAMPAIGN_BATCH_SIZE=50                             # Default: 50
+   TIERII_CAMPAIGN_DELAY_MINUTES=5                           # Default: 5 minutes
+   TIERII_TEST_FALLBACK_FIRST_NAME=Friend                    # Default: Friend
+   TIERII_TEST_CSV_FILENAME=data/contacts/tier_i_tier_ii_emails_verified.csv
+   ```
+   
+   ⚠️ **SECURITY WARNING**: Never commit `.env` files to version control!
 
 5. **Test your setup**
    ```bash
-   python test_email_settings.py
+   python -m pytest tests/
+   ```
+
+6. **Verify installation**
+   ```bash
+   # Verify installation
+   python -c "import src.email_campaign; print('Installation successful')"
    ```
 
 ### Running the Campaign
 
 1. **Verify your contact data**
    ```bash
-   python test_csv_reader.py
+   python scripts/t_csv_reader.py
    ```
 
 2. **Launch the email campaign**
    ```bash
-   python email_campaign.py
+   python src/email_campaign.py
    ```
 
 The script will:
@@ -100,25 +115,22 @@ The script will:
 
 ## ⚙️ Configuration Options
 
-### Email Settings (`config.py`)
+### MailerSend Settings
 
-- `SENDER_EMAIL`: Your Microsoft 365 email address
-- `SMTP_SERVER`: Microsoft 365 SMTP server (smtp.office365.com)
-- `SMTP_PORT`: SMTP port (587 for TLS)
-- `BATCH_SIZE`: Number of emails per batch (default: 10)
-- `DELAY_MINUTES`: Minutes to wait between batches (default: 3)
-
-### OAuth Credentials
-
-- `TENANT_ID`: Your Azure AD tenant ID
-- `CLIENT_ID`: Your Azure AD application client ID
-- `CLIENT_SECRET`: Your Azure AD application client secret
+- `TIERII_SENDER_EMAIL`: Your verified sender email address
+- `TIERII_MAILERSEND_API_TOKEN`: Your MailerSend API token
+- `TIERII_SENDER_NAME`: Display name for email sender
+- `TIERII_CAMPAIGN_BATCH_SIZE`: Number of emails per batch (default: 50)
+- `TIERII_CAMPAIGN_DELAY_MINUTES`: Minutes to wait between batches (default: 5)
+- `TIERII_EMAIL_TEMPLATE_PATH`: Path to email template (default: templates/email_template.html)
+- `TIERII_TEST_FALLBACK_FIRST_NAME`: Default first name for personalization (default: Friend)
+- `TIERII_TEST_CSV_FILENAME`: Path to CSV file (default: data/contacts/tier_i_tier_ii_emails_verified.csv)
 
 ## 📊 Data Source
 
 The project includes a verified CSV database (`tier_i_tier_ii_emails_verified.csv`) containing:
 
-- **120 verified contacts** from licensed NY cannabis businesses
+- **119 verified contacts** from licensed NY cannabis businesses
 - **License information**: License numbers, types, and status
 - **Business details**: Entity names, addresses, and operational status
 - **Contact information**: Primary contact names and email addresses
@@ -134,11 +146,33 @@ The project includes a verified CSV database (`tier_i_tier_ii_emails_verified.cs
 
 ## 🔒 Security & Compliance
 
+### ⚠️ CRITICAL SECURITY WARNINGS
+
+**Environment Variables & Secrets Management:**
+- **NEVER commit `.env` files to version control** - they contain sensitive credentials
+- **NEVER hardcode secrets** in source code or configuration files
+- **Use unique, strong API tokens** and rotate them regularly
+- **Limit access** to `.env` files using appropriate file permissions (600/640)
+- **Use secure secret management** for production deployments
+- **Audit access** to configuration files and credentials regularly
+
+**MailerSend API Security:**
+- **Protect your API token** - treat it like a password
+- **Use domain verification** to prevent unauthorized sending
+- **Monitor API usage** and revoke compromised tokens immediately
+- **Enable webhook security** for delivery tracking
+
+**Development Security:**
+- **Use separate credentials** for development, staging, and production
+- **Never share credentials** via email, chat, or other insecure channels
+- **Clean up test data** and temporary credentials after development
+- **Review code changes** for accidentally committed secrets before merging
+
 ### Data Protection
-- OAuth 2.0 authentication (no password storage)
-- Automatic token refresh and management
-- Secure credential handling
+- MailerSend API authentication (secure token-based access)
+- Environment-based secure credential handling
 - Rate limiting to prevent abuse
+- Input validation and sanitization
 
 ### Email Compliance
 - Personalized, relevant business communications
@@ -152,24 +186,24 @@ The project includes a verified CSV database (`tier_i_tier_ii_emails_verified.cs
 - Compliant with cannabis industry regulations
 - Follows email marketing best practices
 
-## 🧪 Testing Scripts
+## 🧪 Testing
 
-### `test_csv_reader.py`
-Validates the CSV data structure and contact information:
+### Run Test Suite
+Run the complete test suite to validate functionality:
 ```bash
-python test_csv_reader.py
+python -m pytest tests/ -v
 ```
 
-### `test_email_settings.py`
-Tests email configuration and OAuth authentication:
+### Run with Coverage
+Generate test coverage reports:
 ```bash
-python test_email_settings.py
+python -m pytest tests/ --cov=src --cov-report=html
 ```
 
-### `test_oauth_smtp.py`
-Specifically tests OAuth 2.0 SMTP authentication:
+### Test CSV Data
+Validate contact data structure:
 ```bash
-python test_oauth_smtp.py
+python scripts/t_csv_reader.py
 ```
 
 ## 📈 Usage Analytics
@@ -185,15 +219,16 @@ The campaign tool provides real-time feedback:
 
 ### Common Issues
 
-1. **OAuth Authentication Errors**
-   - Verify SMTP AUTH is enabled in Microsoft 365
-   - Check API permissions in Azure AD
-   - Ensure client credentials are correct
+1. **MailerSend API Errors**
+   - Verify your API token is correct and active
+   - Check that your sender domain is verified in MailerSend
+   - Ensure you haven't exceeded your sending limits
 
 2. **Email Sending Failures**
    - Check internet connection
-   - Verify SMTP server settings
+   - Verify MailerSend API status
    - Review rate limiting configuration
+   - Check sender domain verification status
 
 3. **CSV Data Issues**
    - Validate CSV file format
@@ -202,9 +237,9 @@ The campaign tool provides real-time feedback:
 
 ### Getting Help
 
-Run the OAuth setup guide for detailed configuration instructions:
+Run the test suite to validate your configuration:
 ```bash
-python oauth_setup_guide.py
+python -m pytest tests/ -v
 ```
 
 ## 📝 License

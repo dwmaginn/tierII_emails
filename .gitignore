@@ -167,3 +167,11 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
+
+.env.david
+.env.luke
+
+sensitive/
+
+venv/
+.ruff_cache/

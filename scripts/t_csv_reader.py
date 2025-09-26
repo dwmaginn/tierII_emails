@@ -63,7 +63,7 @@ def main():
     # Show first few contacts as preview
     print("\nPREVIEW OF FIRST 10 CONTACTS:")
     for i, contact in enumerate(contacts[:10]):
-        print(f"{i+1"2d"}. {contact['contact_name']"30"} -> First name: \"{contact['first_name']"15"}\" -> {contact['email']}")
+        print(f"{str(i + 1).zfill(2)}. {contact['contact_name']:<30} -> First name: \"{contact['first_name']:<15}\" -> {contact['email']}")
 
     if len(contacts) > 10:
         print("...")
@@ -74,7 +74,7 @@ def main():
     print("Next steps:")
     print("1. Update config.py with your email credentials")
     print("2. Run: python email_campaign.py")
-    print("3. The script will first send a test email to dwmaginn@gmail.com")
+    print("3. The script will first send a test email to your configured test recipient")
     print("4. After you confirm the test worked, it will ask for approval to send to all contacts")
     print("="*60)
 
