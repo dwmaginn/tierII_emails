@@ -1,7 +1,14 @@
 {
-    "subject": "High-Quality Cannabis Available - Honest Pharmco",
-    "body": "Hi {name},\n\n        This is David from Honest Pharmco. We have a variety of high-quality cannabis available in sativa, indica, and hybrid strains, all with high THC percentages, including:\n            - B&C's\n            - Smalls\n            - Premium Flower\n            \n        Our pricing starts at $600/lb for our lowest grade and increases from there based on quality.\n        \n        Please feel free to reach out with any questions to discuss availability.\n        \n        Best,\n        David",
+    "subject": "Wholesale Cannabis Program - Honest Pharmco",
+    "body": "Hi {name},\n\nI'm David with Honest Pharmco. We're launching our wholesale program and wanted to share current inventory.\n\nWe have 500+ lbs available across multiple strains, including Red Velvet, Orange Cream Pop, and OG Pound Cake.\n\nPricing starts at $550 per pound and varies by strain, quantity, and availability. Delivery is available within 24 hours.\n\nIf you're interested, please don't hesitate to reach out for the full inventory, current pricing, or to schedule a call.\n\nThank you,\nDavid\nHonest Pharmco\n(585) 519-9778 | david@honestpharmco.com | honestpharmco.com",
     "html": "templates/wholesale_template.html",
-    "attachments": [],
+    "attachments": [
+        {
+            "path": "templates/assets/hpc_transparent.png",
+            "filename": "hpc_transparent.png",
+            "content_id": "hpc_logo",
+            "disposition": "inline"
+        }
+    ],
     "contacts": "data/test/testdata.csv"
 }

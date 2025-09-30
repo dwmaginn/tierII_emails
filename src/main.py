@@ -16,6 +16,7 @@ from colorama import init, Fore, Back, Style
 init(autoreset=True)
 
 load_dotenv()
+# Load config at module level for CONTACT_FILE initialization
 config = load_email_config()
 rate_config = json.load(open('rate_config.json'))
 
@@ -137,6 +138,9 @@ def log_successful_emails(contacts, failed_contacts):
     logger.info(f"✅ Successful emails logged to: {success_file_path}")
     
 def send_in_bulk():
+    # Load config inside the function to allow for mocking
+    config = load_email_config()
+    
     ms = MailerSendClient(os.getenv('TIERII_MAILERSEND_API_TOKEN'))
     contacts = parse_contacts_from_csv(CONTACT_FILE)
     successes = 0
@@ -155,13 +159,21 @@ def send_in_bulk():
             # Replace {name} placeholder with the contact's first name using string replacement
             html_content = config['html_content'].replace('{name}', contact['first_name']) if config['html_content'] else ""
             
-            email = EmailBuilder() \
+            email_builder = EmailBuilder() \
                 .from_email(os.getenv('TIERII_SENDER_EMAIL')) \
                 .to_many([{"email": contact['Email'], "name": contact['Primary Contact Name']}]) \
                 .subject(config['subject']) \
                 .html(html_content) \
-                .text(config['body'].format(name=contact['first_name'])) \
-                .build()
+                .text(config['body'].format(name=contact['first_name']))
+            
+            # Add attachments if they exist
+            if config.get('processed_attachments'):
+                for attachment in config['processed_attachments']:
+                    path = attachment['path']
+                    email_builder.attach_file(path, disposition=attachment['disposition'])
+                    
+            
+            email = email_builder.build()
             response = ms.emails.send(email)
             if response.status_code == 202:
                 logger.info(f"✅ Email sent to {contact['Email']} successfully!")

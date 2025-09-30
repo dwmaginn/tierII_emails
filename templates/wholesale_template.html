@@ -27,12 +27,13 @@
             padding-bottom: 25px;
             margin-bottom: 35px;
         }
-        .company-name {
-            color: #4a6741;
-            font-size: 28px;
-            font-weight: 700;
+        .company-logo {
+            max-width: 200px;
+            height: auto;
             margin: 0;
-            letter-spacing: 0.5px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         .greeting {
             font-size: 20px;
@@ -92,13 +93,29 @@
             font-weight: 600;
             color: #4a6741;
         }
-        .footer {
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #4a6741 0%, #5a7851 100%);
+            color: #ffffff;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
             text-align: center;
-            margin-top: 35px;
-            padding-top: 25px;
-            border-top: 2px solid #e2e8f0;
-            font-size: 13px;
-            color: #718096;
+            border: none;
+            box-shadow: 0 2px 8px rgba(74, 103, 65, 0.3);
+            transition: all 0.3s ease;
+        }
+        .cta-button:hover {
+            background: linear-gradient(135deg, #5a7851 0%, #4a6741 100%);
+            box-shadow: 0 4px 12px rgba(74, 103, 65, 0.4);
+            transform: translateY(-1px);
+        }
+        .cta-container {
+            text-align: center;
+            margin: 25px 0;
         }
         @media (max-width: 600px) {
             body {
@@ -107,8 +124,8 @@
             .email-container {
                 padding: 20px;
             }
-            .company-name {
-                font-size: 20px;
+            .company-logo {
+                max-width: 150px;
             }
             .greeting {
                 font-size: 16px;
@@ -116,13 +133,25 @@
             .content {
                 font-size: 14px;
             }
+            .cta-button {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+        }
+        .footer {
+            text-align: center;
+            margin-top: 35px;
+            padding-top: 25px;
+            border-top: 2px solid #e2e8f0;
+            font-size: 13px;
+            color: #718096;
         }
     </style>
 </head>
 <body>
     <div class="email-container">
         <div class="header">
-            <h1 class="company-name">Honest Pharmco</h1>
+            <img src="cid:hpc_logo" alt="Honest Pharmco" class="company-logo" />
         </div>
         
         <div class="greeting">
@@ -130,9 +159,9 @@
         </div>
         
         <div class="content">
-            <p>My name is David - I am working with Honest Pharmco. We are launching our wholesale operation and wanted to reach out with what we currently have available.</p>
+            <p>I'm David with Honest Pharmco. We're launching our wholesale program and wanted to share current inventory.</p>
             
-            <p>We have a variety of strains, featuring:</p>
+            <p>We have 500+ lbs available across multiple strains, including, but not limited to:</p>
             
             <div class="product-list">
                 <ul>
@@ -140,23 +169,24 @@
                     <li><strong>Orange Cream Pop</strong></li>
                     <li><strong>OG Pound Cake</strong></li>
                 </ul>
-                <p style="margin-top: 15px; color: #555;"><em>...to name just a few with over 500lbs available.</em></p>
             </div>
             
             <div class="pricing">
-                <p><strong>Pricing starts at $550 a pound and will be based on strain, quantity and availability.</strong></p>
+                <p><strong>Pricing starts at $550 per pound and varies by strain, quantity, and availability. Delivery is available within 24 hours.</strong></p>
             </div>
             
-            <div class="highlight-box">
-                <p><strong>We can also offer delivery within 24 hours.</strong></p>
-            </div>
+            <p>If you're interested, please don't hesitate to reach out for the full inventory, current pricing, or to schedule a call. You can see our current wholesale menu below:</p>
             
-            <p>Please reach out if you're interested and we can have a discussion.</p>
+            <div class="cta-container">
+                <a href="https://honestpharmco.com/wholesale" class="cta-button">View Wholesale Menu</a>
+            </div>
         </div>
         
         <div class="signature">
             <p>Thank you,<br>
-            <span class="signature-name">David</span></p>
+            <span class="signature-name">David</span><br>
+            <span style="color: #4a6741; font-weight: 600;">Honest Pharmco</span><br>
+            <span style="color: #718096; font-size: 14px;">(585) 519-9778 | david@honestpharmco.com | <a href="https://honestpharmco.com" style="color: #4a6741; text-decoration: none;">honestpharmco.com</a></span></p>
         </div>
         
         <div class="footer">
