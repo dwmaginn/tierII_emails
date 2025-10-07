@@ -136,12 +136,78 @@ def log_successful_emails(contacts, failed_contacts):
             writer.writerow(log_entry)
     logger.info(f"✅ Successful emails logged to: {success_file_path}")
     
+def display_blast_summary(contacts):
+    """Display a summary of the pending email blast for user review.
+    
+    Args:
+        contacts: List of contact dictionaries to be emailed.
+    """
+    print(f"\n{'='*70}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}📊 EMAIL BLAST SUMMARY{Style.RESET_ALL}")
+    print(f"{'='*70}\n")
+    
+    print(f"{Fore.YELLOW}Total Contacts:{Style.RESET_ALL} {len(contacts)}")
+    print(f"{Fore.YELLOW}Subject:{Style.RESET_ALL} {config['subject']}")
+    print(f"{Fore.YELLOW}From:{Style.RESET_ALL} {os.getenv('TIERII_SENDER_EMAIL')}\n")
+    
+    # Display first 5 contacts as preview
+    preview_count = min(5, len(contacts))
+    print(f"{Fore.CYAN}Preview of first {preview_count} recipients:{Style.RESET_ALL}")
+    print(f"{'-'*70}")
+    
+    for i, contact in enumerate(contacts[:preview_count], 1):
+        entity = contact.get('Entity Name', 'N/A')
+        email = contact.get('Email', 'N/A')
+        name = contact.get('Primary Contact Name', 'N/A')
+        print(f"{i}. {Fore.GREEN}{name}{Style.RESET_ALL} ({email}) - {entity}")
+    
+    if len(contacts) > preview_count:
+        print(f"   {Fore.YELLOW}... and {len(contacts) - preview_count} more{Style.RESET_ALL}")
+    
+    print(f"{'-'*70}\n")
+
+
+def request_blast_approval(contacts):
+    """Request user approval before sending email blast.
+    
+    Args:
+        contacts: List of contact dictionaries to be emailed.
+        
+    Returns:
+        bool: True if user approves, False otherwise.
+    """
+    display_blast_summary(contacts)
+    
+    print(f"{Fore.YELLOW}{Style.BRIGHT}⚠️  WARNING: This will send {len(contacts)} emails!{Style.RESET_ALL}\n")
+    
+    while True:
+        response = input(f"{Fore.CYAN}Do you want to proceed with this email blast? (yes/no): {Style.RESET_ALL}").strip().lower()
+        
+        if response in ['yes', 'y']:
+            logger.info(f"✅ User approved email blast for {len(contacts)} contacts")
+            print(f"\n{Fore.GREEN}✅ Blast approved! Starting email campaign...{Style.RESET_ALL}\n")
+            return True
+        elif response in ['no', 'n']:
+            logger.warning(f"❌ User cancelled email blast for {len(contacts)} contacts")
+            print(f"\n{Fore.RED}❌ Blast cancelled by user.{Style.RESET_ALL}\n")
+            return False
+        else:
+            print(f"{Fore.RED}Invalid input. Please enter 'yes' or 'no'.{Style.RESET_ALL}")
+
+
 def send_in_bulk():
     ms = MailerSendClient(os.getenv('TIERII_MAILERSEND_API_TOKEN'))
     contacts = parse_contacts_from_csv(CONTACT_FILE)
     successes = 0
     iterations = 0
     failures = []
+    
+    logger.info(f"📋 Loaded {len(contacts)} contacts from CSV")
+    
+    # Request approval before sending
+    if not request_blast_approval(contacts):
+        logger.info("🛑 Email campaign aborted - user did not approve")
+        return
     
     logger.info(f"🚀 Starting email campaign for {len(contacts)} contacts")
     
