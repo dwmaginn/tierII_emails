@@ -1,7 +1,7 @@
 {
-    "subject": "High-Quality Cannabis Available - Honest Pharmco",
-    "body": "Hi {name},\n\n        This is David from Honest Pharmco. We have a variety of high-quality cannabis available in sativa, indica, and hybrid strains, all with high THC percentages, including:\n            - B&C's\n            - Smalls\n            - Premium Flower\n            \n        Our pricing starts at $600/lb for our lowest grade and increases from there based on quality.\n        \n        Please feel free to reach out with any questions to discuss availability.\n        \n        Best,\n        David",
-    "html": "templates/email_template.html",
+    "subject": "Bulk Pre-Rolled Joints - Honest Pharmco",
+    "body": "Hi {name},\n\nWe’re offering bulk pre-rolled joints with tiered pricing:\n- 20,000+ joints — $2.00 ea\n- 10,000–19,999 — $2.50 ea\n- Up to 9,999 — $3.00 ea\n\nReply with your target quantity and I’ll confirm availability and lead times.\n\nBest,\nDavid",
+    "html": "templates/10-7/joint-template.html",
     "attachments": [],
     "contacts": "data/test/testdata.csv"
 }
